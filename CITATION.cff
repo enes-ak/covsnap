@@ -1,11 +1,11 @@
 cff-version: 1.2.0
-message: "If you use covinspector, please cite it using these metadata."
-title: "covinspector: Coverage inspector for targeted sequencing QC"
+message: "If you use covsnap, please cite it using these metadata."
+title: "covsnap: Coverage inspector for targeted sequencing QC"
 type: software
 version: 0.1.0
 date-released: "2026-02-06"
 license: MIT
-repository-code: "https://github.com/covinspector/covinspector"
+repository-code: "https://github.com/covsnap/covsnap"
 keywords:
   - bioinformatics
   - coverage
@@ -18,7 +18,7 @@ authors:
     given-names: "FIRST_NAME"
     orcid: "https://orcid.org/0000-0000-0000-0000"
 abstract: >-
-  covinspector computes per-target and per-exon depth metrics from
+  covsnap computes per-target and per-exon depth metrics from
   BAM/CRAM files aligned to hg38, producing machine-readable metrics
   and human-readable interpreted reports with PASS/FAIL coverage
   classifications. It ships with a bundled GENCODE v44 gene index

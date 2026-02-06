@@ -1,4 +1,4 @@
-"""CLI smoke tests for covinspector.
+"""CLI smoke tests for covsnap.
 
 These tests verify that the CLI entry point works end-to-end,
 produces expected output files, and contains required columns/sections.
@@ -12,7 +12,7 @@ import shutil
 
 import pytest
 
-from covinspector.cli import main
+from covsnap.cli import main
 
 
 def _requires_samtools():
@@ -26,7 +26,7 @@ class TestCLIVersion:
             main(["--version"])
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
-        assert "covinspector" in captured.out.lower() or "0.1.0" in captured.out
+        assert "covsnap" in captured.out.lower() or "0.1.0" in captured.out
 
 
 class TestCLIValidation:
@@ -94,7 +94,7 @@ class TestCLIGeneMode:
         ])
 
         with open(raw_out) as f:
-            lines = [line for line in f if not line.startswith("#covinspector")]
+            lines = [line for line in f if not line.startswith("#covsnap")]
             reader = csv.DictReader(lines, delimiter="\t")
             rows = list(reader)
 
@@ -131,7 +131,7 @@ class TestCLIGeneMode:
 
         with open(report_out) as f:
             content = f.read()
-            assert "# covinspector Coverage Report" in content
+            assert "# covsnap Coverage Report" in content
             assert "BRCA1" in content
             assert "hg38" in content
             assert "GENCODE v44" in content or "gencode_v44" in content
@@ -158,7 +158,7 @@ class TestCLIRegionMode:
         assert os.path.isfile(raw_out)
 
         with open(raw_out) as f:
-            lines = [line for line in f if not line.startswith("#covinspector")]
+            lines = [line for line in f if not line.startswith("#covsnap")]
             reader = csv.DictReader(lines, delimiter="\t")
             rows = list(reader)
             assert len(rows) == 1
@@ -183,7 +183,7 @@ class TestCLIBedMode:
         ])
 
         with open(raw_out) as f:
-            lines = [line for line in f if not line.startswith("#covinspector")]
+            lines = [line for line in f if not line.startswith("#covsnap")]
             reader = csv.DictReader(lines, delimiter="\t")
             rows = list(reader)
             assert len(rows) == 2
@@ -246,7 +246,7 @@ class TestCLIExonMode:
         _requires_samtools()
 
     def test_exons_flag_produces_exon_tsv(self, synthetic_bam, tmp_output_dir):
-        from covinspector.annotation import _has_full_index
+        from covsnap.annotation import _has_full_index
 
         if not _has_full_index():
             pytest.skip("Full gene/exon index not built")
@@ -269,7 +269,7 @@ class TestCLIExonMode:
 
         # Verify exon TSV structure
         with open(exon_out) as f:
-            lines = [line for line in f if not line.startswith("#covinspector")]
+            lines = [line for line in f if not line.startswith("#covsnap")]
             reader = csv.DictReader(lines, delimiter="\t")
             rows = list(reader)
 
@@ -290,7 +290,7 @@ class TestCLIExonMode:
                 assert row["exon_id"].startswith("ENSE")
 
     def test_exons_report_contains_exon_table(self, synthetic_bam, tmp_output_dir):
-        from covinspector.annotation import _has_full_index
+        from covsnap.annotation import _has_full_index
 
         if not _has_full_index():
             pytest.skip("Full gene/exon index not built")

@@ -1,4 +1,4 @@
-{% set name = "covinspector" %}
+{% set name = "covsnap" %}
 {% set version = "0.1.0" %}
 
 package:
@@ -6,14 +6,14 @@ package:
   version: {{ version }}
 
 source:
-  url: https://github.com/enes-ak/covinspector/archive/v{{ version }}.tar.gz
+  url: https://github.com/enes-ak/covsnap/archive/v{{ version }}.tar.gz
   sha256: PLACEHOLDER_SHA256
 
 build:
   number: 0
   noarch: python
   entry_points:
-    - covinspector = covinspector.cli:main
+    - covsnap = covsnap.cli:main
   script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vvv
   run_exports:
     - {{ pin_subpackage(name, max_pin="x.x") }}
@@ -37,16 +37,16 @@ requirements:
 
 test:
   imports:
-    - covinspector
-    - covinspector.cli
-    - covinspector.engines
-    - covinspector.annotation
+    - covsnap
+    - covsnap.cli
+    - covsnap.engines
+    - covsnap.annotation
   requires:
     - pytest
     - samtools
   commands:
     # Version check
-    - covinspector --version
+    - covsnap --version
 
     # Generate minimal synthetic test BAM (10 reads over a tiny region)
     # This avoids shipping BAM files in the package and needs no network.
@@ -82,7 +82,7 @@ test:
       "
 
     # Smoke test: gene mode
-    - covinspector test_sorted.bam BRCA1 --raw-out test_raw.tsv --report-out test_report.md --engine samtools
+    - covsnap test_sorted.bam BRCA1 --raw-out test_raw.tsv --report-out test_report.md --engine samtools
     - test -f test_raw.tsv
     - test -f test_report.md
 
@@ -90,7 +90,7 @@ test:
     - |
       python -c "
       with open('test_raw.tsv') as f:
-          lines = [l for l in f if not l.startswith('#covinspector')]
+          lines = [l for l in f if not l.startswith('#covsnap')]
           header = lines[0].strip().split('\t')
           required = ['target_id', 'contig', 'start', 'end', 'length_bp',
                       'mean_depth', 'median_depth', 'min_depth', 'max_depth',
@@ -109,7 +109,7 @@ test:
       python -c "
       with open('test_report.md') as f:
           content = f.read()
-          assert '# covinspector Coverage Report' in content
+          assert '# covsnap Coverage Report' in content
           assert 'BRCA1' in content
           assert 'GENCODE v44' in content or 'gencode_v44' in content
           assert 'hg38' in content
@@ -117,33 +117,33 @@ test:
       "
 
     # Smoke test: region mode
-    - covinspector test_sorted.bam chr17:43044295-43125482 --raw-out test_region.tsv --report-out test_region.md --engine samtools
+    - covsnap test_sorted.bam chr17:43044295-43125482 --raw-out test_region.tsv --report-out test_region.md --engine samtools
     - test -f test_region.tsv
 
     # Cleanup
     - rm -f test_sorted.bam test_sorted.bam.bai test_raw.tsv test_report.md test_region.tsv test_region.md
 
 about:
-  home: https://github.com/enes-ak/covinspector
+  home: https://github.com/enes-ak/covsnap
   license: MIT
   license_family: MIT
   license_file: LICENSE
   summary: Coverage inspector for targeted sequencing QC (hg38)
   description: |
-    covinspector computes per-target and per-exon depth metrics from
+    covsnap computes per-target and per-exon depth metrics from
     BAM/CRAM files, producing a machine-readable raw TSV and a
     human-readable interpreted report with PASS/FAIL classifications.
     Supports gene symbols, genomic regions, and BED files as input.
     Ships with a bundled GENCODE v44 hg38 gene index — no internet
     or GTF files required at runtime.
-  dev_url: https://github.com/enes-ak/covinspector
-  doc_url: https://github.com/enes-ak/covinspector/blob/main/README.md
+  dev_url: https://github.com/enes-ak/covsnap
+  doc_url: https://github.com/enes-ak/covsnap/blob/main/README.md
 
 extra:
   recipe-maintainers:
     - enes-ak
   identifiers:
-    - biotools:covinspector
+    - biotools:covsnap
   additional-platforms:
     - linux-aarch64
     - osx-arm64

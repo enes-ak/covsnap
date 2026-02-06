@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for covinspector tests."""
+"""Shared pytest fixtures for covsnap tests."""
 
 import os
 

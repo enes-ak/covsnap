@@ -2,7 +2,7 @@
 
 import pytest
 
-from covinspector.annotation import (
+from covsnap.annotation import (
     _has_full_index,
     detect_contig_style,
     is_region_string,
@@ -157,7 +157,7 @@ class TestFullIndexLookup:
 
     def test_full_index_gene_count(self):
         """Tabix index has tens of thousands of genes."""
-        from covinspector.annotation import _load_tabix_index
+        from covsnap.annotation import _load_tabix_index
 
         tbx = _load_tabix_index()
         assert tbx is not None

@@ -20,7 +20,7 @@ from typing import Any, Optional
 
 import pysam
 
-from covinspector import ANNOTATION_VERSION
+from covsnap import ANNOTATION_VERSION
 
 logger = logging.getLogger(__name__)
 

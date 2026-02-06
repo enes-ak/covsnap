@@ -1,4 +1,4 @@
-"""CLI entry point for covinspector.
+"""CLI entry point for covsnap.
 
 Orchestrates: argument parsing → input validation → annotation lookup →
 engine execution → classification → output writing.
@@ -15,8 +15,8 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from covinspector import ANNOTATION_VERSION, BUILD, __version__
-from covinspector.annotation import (
+from covsnap import ANNOTATION_VERSION, BUILD, __version__
+from covsnap.annotation import (
     detect_contig_style,
     get_sample_name,
     is_region_string,
@@ -26,11 +26,11 @@ from covinspector.annotation import (
     suggest_genes,
     translate_contig,
 )
-from covinspector.bed import BedInterval, enforce_limits, stream_bed_intervals
-from covinspector.engines import compute_depth, ensure_index, select_engine
-from covinspector.metrics import TargetResult
-from covinspector.output import write_exon_tsv, write_json, write_lowcov_bed, write_raw_tsv
-from covinspector.report import (
+from covsnap.bed import BedInterval, enforce_limits, stream_bed_intervals
+from covsnap.engines import compute_depth, ensure_index, select_engine
+from covsnap.metrics import TargetResult
+from covsnap.output import write_exon_tsv, write_json, write_lowcov_bed, write_raw_tsv
+from covsnap.report import (
     ClassifyParams,
     ReportContext,
     classify_exon,
@@ -38,7 +38,7 @@ from covinspector.report import (
     write_report,
 )
 
-logger = logging.getLogger("covinspector")
+logger = logging.getLogger("covsnap")
 
 
 # ---------------------------------------------------------------------------
@@ -48,9 +48,9 @@ logger = logging.getLogger("covinspector")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="covinspector",
+        prog="covsnap",
         description=(
-            "covinspector — Coverage inspector for targeted sequencing QC (hg38 only).\n\n"
+            "covsnap — Coverage inspector for targeted sequencing QC (hg38 only).\n\n"
             "Computes per-target and optionally per-exon depth metrics from BAM/CRAM\n"
             "files, producing a machine-readable raw TSV and a human-readable\n"
             "interpreted report with PASS/FAIL classifications."
@@ -58,14 +58,14 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  covinspector sample.bam BRCA1\n"
-            "  covinspector sample.bam chr17:43044295-43125482\n"
-            "  covinspector sample.bam --bed targets.bed\n"
-            "  covinspector sample.cram BRCA1 --reference hg38.fa --exons\n"
+            "  covsnap sample.bam BRCA1\n"
+            "  covsnap sample.bam chr17:43044295-43125482\n"
+            "  covsnap sample.bam --bed targets.bed\n"
+            "  covsnap sample.cram BRCA1 --reference hg38.fa --exons\n"
         ),
     )
 
-    parser.add_argument("--version", action="version", version=f"covinspector {__version__}")
+    parser.add_argument("--version", action="version", version=f"covsnap {__version__}")
 
     # ── Positional ──
     parser.add_argument(
@@ -128,14 +128,14 @@ def build_parser() -> argparse.ArgumentParser:
     out.add_argument(
         "--raw-out",
         metavar="FILE",
-        default="covinspector.raw.tsv",
-        help="Raw metrics TSV output path (default: covinspector.raw.tsv).",
+        default="covsnap.raw.tsv",
+        help="Raw metrics TSV output path (default: covsnap.raw.tsv).",
     )
     out.add_argument(
         "--report-out",
         metavar="FILE",
-        default="covinspector.report.md",
-        help="Interpreted report markdown output path (default: covinspector.report.md).",
+        default="covsnap.report.md",
+        help="Interpreted report markdown output path (default: covsnap.report.md).",
     )
     out.add_argument(
         "--json-out",
@@ -146,8 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
     out.add_argument(
         "--exon-out",
         metavar="FILE",
-        default="covinspector.exons.tsv",
-        help="Exon-level metrics TSV (default: covinspector.exons.tsv). Only written if --exons.",
+        default="covsnap.exons.tsv",
+        help="Exon-level metrics TSV (default: covsnap.exons.tsv). Only written if --exons.",
     )
 
     # ── Low-coverage output ──
@@ -160,8 +160,8 @@ def build_parser() -> argparse.ArgumentParser:
     lc.add_argument(
         "--lowcov-bed",
         metavar="FILE",
-        default="covinspector.lowcov.bed",
-        help="Output BED for low-coverage blocks (default: covinspector.lowcov.bed).",
+        default="covsnap.lowcov.bed",
+        help="Output BED for low-coverage blocks (default: covsnap.lowcov.bed).",
     )
     lc.add_argument(
         "--lowcov-threshold",
@@ -312,7 +312,7 @@ def _validate_args(args: argparse.Namespace) -> None:
 
 def _error(message: str, code: int = 1) -> None:
     """Print an error to stderr and exit."""
-    print(f"[covinspector] ERROR: {message}", file=sys.stderr)
+    print(f"[covsnap] ERROR: {message}", file=sys.stderr)
     sys.exit(code)
 
 
@@ -366,7 +366,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     logging.basicConfig(
         level=log_level,
-        format="[covinspector] %(levelname)s: %(message)s",
+        format="[covsnap] %(levelname)s: %(message)s",
         stream=sys.stderr,
     )
 
@@ -629,7 +629,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         n_pass = sum(1 for r in results if r.coverage_status == "PASS")
         n_total = len(results)
         print(
-            f"[covinspector] Done. {n_pass}/{n_total} targets PASS. "
+            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. "
             f"Raw: {args.raw_out}  Report: {args.report_out}",
             file=sys.stderr,
         )

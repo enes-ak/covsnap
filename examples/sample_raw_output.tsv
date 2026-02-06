@@ -1,4 +1,4 @@
-#covinspector_version=0.1.0	annotation=gencode_v44	build=hg38	engine=mosdepth	date=2026-02-06T14:30:00Z
+#covsnap_version=0.1.0	annotation=gencode_v44	build=hg38	engine=mosdepth	date=2026-02-06T14:30:00Z
 target_id	contig	start	end	length_bp	mean_depth	median_depth	min_depth	max_depth	stdev_depth	pct_zero	pct_ge_1	pct_ge_5	pct_ge_10	pct_ge_20	pct_ge_30	pct_ge_50	pct_ge_100	n_lowcov_blocks	lowcov_total_bp	engine_used	bam_path	sample_name	build	annotation_version
 BRCA1	chr17	43044294	43125482	81188	145.32	138.00	0	612	42.17	0.38	99.62	99.10	98.74	97.81	95.22	82.45	38.91	2	270	mosdepth	/data/sample.bam	NA12878	hg38	gencode_v44
 BRCA2	chr13	32315085	32400268	85183	52.07	48.00	0	289	31.44	3.21	96.79	94.55	91.08	82.14	68.33	35.70	5.12	7	4830	mosdepth	/data/sample.bam	NA12878	hg38	gencode_v44

@@ -2,8 +2,8 @@
 
 import os
 
-from covinspector.metrics import LowCovBlock, TargetResult
-from covinspector.report import ClassifyParams, classify_target
+from covsnap.metrics import LowCovBlock, TargetResult
+from covsnap.report import ClassifyParams, classify_target
 
 
 def _make_result(**overrides) -> TargetResult:

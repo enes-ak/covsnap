@@ -1,7 +1,7 @@
 """Depth computation engines: samtools depth and mosdepth.
 
 Both engines stream per-base depth data and feed it into
-:class:`~covinspector.metrics.TargetAccumulator` instances,
+:class:`~covsnap.metrics.TargetAccumulator` instances,
 so RAM usage is O(targets) regardless of region size.
 """
 
@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 from typing import Optional
 
-from covinspector.metrics import TargetAccumulator, TargetResult
+from covsnap.metrics import TargetAccumulator, TargetResult
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ def _make_target_specs(
 
 def _write_tmp_bed(targets: list[_TargetSpec], tmp_dir: str) -> str:
     """Write targets to a temporary BED file, return path."""
-    bed_path = os.path.join(tmp_dir, "covinspector_targets.bed")
+    bed_path = os.path.join(tmp_dir, "covsnap_targets.bed")
     with open(bed_path, "w") as fh:
         for t in targets:
             fh.write(f"{t.contig}\t{t.start}\t{t.end}\t{t.target_id}\n")
@@ -151,7 +151,7 @@ def compute_depth(
     specs = _make_target_specs(regions)
     cleanup_tmp = tmp_dir is None
     if tmp_dir is None:
-        tmp_dir = tempfile.mkdtemp(prefix="covinspector_")
+        tmp_dir = tempfile.mkdtemp(prefix="covsnap_")
 
     try:
         if engine == "samtools":
@@ -297,7 +297,7 @@ def _run_mosdepth(
 ) -> list[TargetResult]:
     """Run mosdepth and parse its outputs for full metrics."""
     bed_path = _write_tmp_bed(targets, tmp_dir)
-    prefix = os.path.join(tmp_dir, "covinspector_mosdepth")
+    prefix = os.path.join(tmp_dir, "covsnap_mosdepth")
 
     threshold_str = ",".join(str(t) for t in sorted(thresholds))
 

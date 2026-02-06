@@ -1,4 +1,4 @@
-#covinspector_version=0.1.0	annotation=gencode_v44	build=hg38
+#covsnap_version=0.1.0	annotation=gencode_v44	build=hg38
 target_id	exon_id	exon_number	contig	start	end	length_bp	mean_depth	median_depth	pct_zero	pct_ge_20	pct_ge_30
 BRCA1	ENSE00003896691.1	24	chr17	43044294	43045802	1508	152.41	145.00	0.00	99.47	97.88
 BRCA1	ENSE00003654080.1	23	chr17	43047643	43048474	831	148.77	142.00	0.00	99.16	97.11

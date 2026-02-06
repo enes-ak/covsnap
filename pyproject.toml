@@ -3,14 +3,14 @@ requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "covinspector"
+name = "covsnap"
 version = "0.1.0"
 description = "Coverage inspector for targeted sequencing QC (hg38)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [
-    {name = "covinspector developers"},
+    {name = "covsnap developers"},
 ]
 keywords = ["bioinformatics", "coverage", "sequencing", "quality-control", "hg38"]
 classifiers = [
@@ -37,21 +37,21 @@ test = [
 ]
 dev = [
     "ruff",
-    "covinspector[test]",
+    "covsnap[test]",
 ]
 
 [project.scripts]
-covinspector = "covinspector.cli:main"
+covsnap = "covsnap.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/enes-ak/covinspector"
-Repository = "https://github.com/enes-ak/covinspector"
+Homepage = "https://github.com/enes-ak/covsnap"
+Repository = "https://github.com/enes-ak/covsnap"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-covinspector = [
+covsnap = [
     "data/*.tsv.gz",
     "data/*.tsv.gz.tbi",
     "data/*.bed.gz",

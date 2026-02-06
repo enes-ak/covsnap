@@ -2,7 +2,7 @@
 
 import pytest
 
-from covinspector.bed import (
+from covsnap.bed import (
     BedInterval,
     check_bed_limits,
     enforce_limits,

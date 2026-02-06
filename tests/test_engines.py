@@ -4,7 +4,7 @@ import shutil
 
 import pytest
 
-from covinspector.engines import compute_depth, select_engine
+from covsnap.engines import compute_depth, select_engine
 
 
 class TestEngineSelection:

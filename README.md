@@ -1,8 +1,8 @@
-# covinspector
+# covsnap
 
 **Coverage inspector for targeted sequencing QC (hg38)**
 
-covinspector computes per-target (and optionally per-exon) depth-of-coverage metrics from BAM/CRAM files aligned to the human reference genome **hg38**. It produces a machine-readable TSV alongside a human-readable Markdown report with automated PASS/FAIL classification heuristics — designed for clinical and research sequencing QC workflows.
+covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics from BAM/CRAM files aligned to the human reference genome **hg38**. It produces a machine-readable TSV alongside a human-readable Markdown report with automated PASS/FAIL classification heuristics — designed for clinical and research sequencing QC workflows.
 
 ---
 
@@ -26,8 +26,8 @@ covinspector computes per-target (and optionally per-exon) depth-of-coverage met
 ### From source (pip)
 
 ```bash
-git clone https://github.com/enes-ak/covinspector.git
-cd covinspector
+git clone https://github.com/enes-ak/covsnap.git
+cd covsnap
 pip install .
 ```
 
@@ -47,7 +47,7 @@ pip install ".[dev]"
 | samtools | any recent | Yes (engine) |
 | mosdepth | >= 0.3 | Optional (preferred engine) |
 
-> **Note:** At least one of `samtools` or `mosdepth` must be on your `$PATH`. When `--engine auto` (the default), covinspector prefers mosdepth and falls back to samtools.
+> **Note:** At least one of `samtools` or `mosdepth` must be on your `$PATH`. When `--engine auto` (the default), covsnap prefers mosdepth and falls back to samtools.
 
 ---
 
@@ -58,19 +58,19 @@ pip install ".[dev]"
 Analyze coverage for a gene by name:
 
 ```bash
-covinspector sample.bam BRCA1
+covsnap sample.bam BRCA1
 ```
 
 This produces two files in the current directory:
-- `covinspector.raw.tsv` — machine-readable metrics
-- `covinspector.report.md` — human-readable interpreted report
+- `covsnap.raw.tsv` — machine-readable metrics
+- `covsnap.report.md` — human-readable interpreted report
 
 ### Region mode
 
 Specify an explicit genomic region (1-based inclusive coordinates):
 
 ```bash
-covinspector sample.bam chr17:43044295-43125482
+covsnap sample.bam chr17:43044295-43125482
 ```
 
 ### BED mode
@@ -78,28 +78,28 @@ covinspector sample.bam chr17:43044295-43125482
 Use a BED file of target intervals:
 
 ```bash
-covinspector sample.bam --bed targets.bed
+covsnap sample.bam --bed targets.bed
 ```
 
 ### CRAM files
 
 ```bash
-covinspector sample.cram BRCA1 --reference hg38.fa
+covsnap sample.cram BRCA1 --reference hg38.fa
 ```
 
 ### With exon-level detail
 
 ```bash
-covinspector sample.bam BRCA1 --exons
+covsnap sample.bam BRCA1 --exons
 ```
 
-This additionally writes `covinspector.exons.tsv` with per-exon metrics for each MANE Select exon.
+This additionally writes `covsnap.exons.tsv` with per-exon metrics for each MANE Select exon.
 
 ---
 
 ## Output Files
 
-### Raw TSV (`covinspector.raw.tsv`)
+### Raw TSV (`covsnap.raw.tsv`)
 
 Tab-separated file with a metadata header line and 25 columns:
 
@@ -133,7 +133,7 @@ Tab-separated file with a metadata header line and 25 columns:
 
 The threshold columns (`pct_ge_X`) are customizable with `--pct-thresholds`.
 
-### Exon TSV (`covinspector.exons.tsv`)
+### Exon TSV (`covsnap.exons.tsv`)
 
 Written when `--exons` is used. Contains 12 columns per exon:
 
@@ -162,7 +162,7 @@ BED file of contiguous low-coverage blocks. Controlled by:
 - `--lowcov-threshold` (default: 10) — depth below which a position is "low-coverage"
 - `--lowcov-min-len` (default: 50) — minimum block length to report
 
-### Markdown report (`covinspector.report.md`)
+### Markdown report (`covsnap.report.md`)
 
 Human-readable report including:
 - Run metadata (sample, build, engine, date)
@@ -189,7 +189,7 @@ Each target is classified using ordered heuristics (first match wins):
 All thresholds are tunable via CLI flags:
 
 ```bash
-covinspector sample.bam BRCA1 \
+covsnap sample.bam BRCA1 \
     --pass-pct-ge-20 98.0 \
     --pass-max-pct-zero 0.5 \
     --dropout-pct-zero 3.0 \
@@ -200,7 +200,7 @@ covinspector sample.bam BRCA1 \
 
 ## BED Guardrails
 
-When using `--bed`, covinspector enforces limits to prevent accidental whole-exome/whole-genome processing:
+When using `--bed`, covsnap enforces limits to prevent accidental whole-exome/whole-genome processing:
 
 | Parameter | Default | Flag |
 |---|---|---|
@@ -229,7 +229,7 @@ wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_44/gencod
 # Build the index
 python scripts/build_gene_index.py gencode.v44.annotation.gtf.gz
 
-# Files are written to src/covinspector/data/
+# Files are written to src/covsnap/data/
 ```
 
 This creates:
@@ -248,7 +248,7 @@ pip install .
 ## Full CLI Reference
 
 ```
-covinspector [-h] [--version] [--bed BED] [--exons] [--reference FASTA]
+covsnap [-h] [--version] [--bed BED] [--exons] [--reference FASTA]
              [--no-index] [--engine {auto,mosdepth,samtools}]
              [--threads N] [--raw-out FILE] [--report-out FILE]
              [--json-out FILE] [--exon-out FILE] [--emit-lowcov]
@@ -279,8 +279,8 @@ covinspector [-h] [--version] [--bed BED] [--exons] [--reference FASTA]
 | `--reference FASTA` | Reference FASTA for CRAM decoding | — |
 | `--engine` | Depth engine: `auto`, `mosdepth`, `samtools` | `auto` |
 | `--threads N` | Threads for mosdepth | 4 |
-| `--raw-out FILE` | Raw TSV output path | `covinspector.raw.tsv` |
-| `--report-out FILE` | Report markdown path | `covinspector.report.md` |
+| `--raw-out FILE` | Raw TSV output path | `covsnap.raw.tsv` |
+| `--report-out FILE` | Report markdown path | `covsnap.report.md` |
 | `--json-out FILE` | JSON output path | — |
 | `-v` / `--verbose` | Increase verbosity (repeatable) | — |
 | `--quiet` | Suppress non-error output | off |
@@ -306,7 +306,7 @@ User-facing region input accepts **1-based inclusive** coordinates (e.g. `chr17:
 ### Basic gene analysis with custom output paths
 
 ```bash
-covinspector sample.bam BRCA1 \
+covsnap sample.bam BRCA1 \
     --raw-out results/brca1.tsv \
     --report-out results/brca1.report.md
 ```
@@ -314,7 +314,7 @@ covinspector sample.bam BRCA1 \
 ### Multi-gene panel via BED
 
 ```bash
-covinspector sample.bam --bed panel_targets.bed \
+covsnap sample.bam --bed panel_targets.bed \
     --raw-out panel_results.tsv \
     --report-out panel_report.md \
     --json-out panel_results.json
@@ -323,7 +323,7 @@ covinspector sample.bam --bed panel_targets.bed \
 ### Exon-level analysis with low-coverage output
 
 ```bash
-covinspector sample.bam BRCA1 \
+covsnap sample.bam BRCA1 \
     --exons \
     --exon-out brca1_exons.tsv \
     --emit-lowcov \
@@ -334,7 +334,7 @@ covinspector sample.bam BRCA1 \
 ### Strict BED guardrails
 
 ```bash
-covinspector sample.bam --bed wes_targets.bed \
+covsnap sample.bam --bed wes_targets.bed \
     --on-large-bed error \
     --max-targets 500 \
     --max-total-bp 10000000
@@ -343,7 +343,7 @@ covinspector sample.bam --bed wes_targets.bed \
 ### Using samtools explicitly
 
 ```bash
-covinspector sample.bam TP53 --engine samtools
+covsnap sample.bam TP53 --engine samtools
 ```
 
 ---
@@ -374,8 +374,8 @@ The test suite uses synthetic BAM files generated on the fly (no real sequencing
 ## Project Structure
 
 ```
-covinspector/
-├── src/covinspector/
+covsnap/
+├── src/covsnap/
 │   ├── __init__.py          # Version, build, annotation constants
 │   ├── cli.py               # CLI entry point and orchestration
 │   ├── annotation.py        # Gene lookup, contig detection, region parsing

@@ -1,4 +1,4 @@
-# covinspector — CLI Specification
+# covsnap — CLI Specification
 
 **Version:** 0.1.0
 **Build:** hg38-only
@@ -10,8 +10,8 @@
 ## 1. Synopsis
 
 ```
-covinspector <BAM/CRAM> <TARGET>
-covinspector <BAM/CRAM> --bed <targets.bed>
+covsnap <BAM/CRAM> <TARGET>
+covsnap <BAM/CRAM> --bed <targets.bed>
 ```
 
 Where `<TARGET>` is one of:
@@ -112,7 +112,7 @@ The tool **auto-detects** the contig naming style from the BAM/CRAM header:
 ## 5. Full CLI Help Text
 
 ```
-usage: covinspector [-h] [--version]
+usage: covsnap [-h] [--version]
                     [--bed BED]
                     [--exons]
                     [--engine {auto,mosdepth,samtools}]
@@ -135,7 +135,7 @@ usage: covinspector [-h] [--version]
                     [--pct-thresholds LIST]
                     alignment [target]
 
-covinspector — Coverage inspector for targeted sequencing QC (hg38 only).
+covsnap — Coverage inspector for targeted sequencing QC (hg38 only).
 
 Computes per-target and optionally per-exon depth metrics from BAM/CRAM
 files, producing a machine-readable raw TSV and a human-readable
@@ -169,17 +169,17 @@ Engine options:
 
 Output options:
   --raw-out FILE        Raw metrics TSV output path
-                        (default: covinspector.raw.tsv).
+                        (default: covsnap.raw.tsv).
   --report-out FILE     Interpreted report markdown output path
-                        (default: covinspector.report.md).
+                        (default: covsnap.report.md).
   --json-out FILE       Optional raw metrics in JSON format.
   --exon-out FILE       Exon-level metrics TSV (default:
-                        covinspector.exons.tsv). Only written if --exons.
+                        covsnap.exons.tsv). Only written if --exons.
 
 Low-coverage output:
   --emit-lowcov         Enable writing low-coverage BED blocks.
   --lowcov-bed FILE     Output BED for low-coverage blocks
-                        (default: covinspector.lowcov.bed).
+                        (default: covsnap.lowcov.bed).
   --lowcov-threshold INT
                         Depth below which a position is "low coverage"
                         (default: 10).
@@ -356,12 +356,12 @@ All thresholds are configurable via CLI flags (see Section 5).
 
 ## 10. Output Schemas
 
-### 10.1 Raw Metrics TSV (`covinspector.raw.tsv`)
+### 10.1 Raw Metrics TSV (`covsnap.raw.tsv`)
 
 **Header line** (prefixed with `#`):
 
 ```
-#covinspector_version=0.1.0	annotation=gencode_v44	build=hg38	engine=mosdepth	date=2026-02-06T14:30:00Z
+#covsnap_version=0.1.0	annotation=gencode_v44	build=hg38	engine=mosdepth	date=2026-02-06T14:30:00Z
 ```
 
 **Columns:**
@@ -396,7 +396,7 @@ All thresholds are configurable via CLI flags (see Section 5).
 
 All `pct_*` values are in range [0.0, 100.0] with 2 decimal places.
 
-### 10.2 Exon Metrics TSV (`covinspector.exons.tsv`)
+### 10.2 Exon Metrics TSV (`covsnap.exons.tsv`)
 
 Written only when `--exons` is supplied and target is a gene.
 
@@ -415,12 +415,12 @@ Written only when `--exons` is supplied and target is a gene.
 | 11 | `pct_ge_20` | float | % bases with depth >= 20 |
 | 12 | `pct_ge_30` | float | % bases with depth >= 30 |
 
-### 10.3 Low-Coverage BED (`covinspector.lowcov.bed`)
+### 10.3 Low-Coverage BED (`covsnap.lowcov.bed`)
 
 Written only when `--emit-lowcov` is supplied. Standard BED3+ format:
 
 ```
-#track name="covinspector_lowcov" description="Low-coverage blocks (depth < 10, min 50bp)"
+#track name="covsnap_lowcov" description="Low-coverage blocks (depth < 10, min 50bp)"
 chr17	43067600	43067750	BRCA1	mean_depth=2.3
 chr17	43091400	43091520	BRCA1	mean_depth=0.0
 ```
@@ -431,7 +431,7 @@ Same data as raw TSV, structured as:
 
 ```json
 {
-  "covinspector_version": "0.1.0",
+  "covsnap_version": "0.1.0",
   "annotation": "gencode_v44",
   "build": "hg38",
   "engine": "mosdepth",
@@ -485,4 +485,4 @@ If the BAM/CRAM file lacks an index (`.bai`, `.csi`, or `.crai`):
 - `--verbose` (`-v`): `INFO` level.
 - `-vv`: `DEBUG` level.
 - `--quiet`: `ERROR` only.
-- Log lines are prefixed: `[covinspector] LEVEL: message`
+- Log lines are prefixed: `[covsnap] LEVEL: message`

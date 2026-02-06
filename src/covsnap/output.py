@@ -6,8 +6,8 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from covinspector import ANNOTATION_VERSION, BUILD, __version__
-from covinspector.metrics import TargetResult
+from covsnap import ANNOTATION_VERSION, BUILD, __version__
+from covsnap.metrics import TargetResult
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ def write_raw_tsv(
     with open(path, "w") as fh:
         # Metadata comment line
         fh.write(
-            f"#covinspector_version={__version__}\t"
+            f"#covsnap_version={__version__}\t"
             f"annotation={ANNOTATION_VERSION}\t"
             f"build={BUILD}\t"
             f"engine={engine_used}\t"
@@ -163,7 +163,7 @@ def write_json(
         targets_list.append(entry)
 
     doc = {
-        "covinspector_version": __version__,
+        "covsnap_version": __version__,
         "annotation": ANNOTATION_VERSION,
         "build": BUILD,
         "engine": engine_used,
@@ -215,7 +215,7 @@ def write_exon_tsv(
 
     with open(path, "w") as fh:
         fh.write(
-            f"#covinspector_version={__version__}\t"
+            f"#covsnap_version={__version__}\t"
             f"annotation={ANNOTATION_VERSION}\t"
             f"build={BUILD}\n"
         )
@@ -253,7 +253,7 @@ def write_lowcov_bed(
     """Write low-coverage blocks as a BED file."""
     with open(path, "w") as fh:
         fh.write(
-            f'#track name="covinspector_lowcov" '
+            f'#track name="covsnap_lowcov" '
             f'description="Low-coverage blocks (depth < {lowcov_threshold}, '
             f'min {lowcov_min_len}bp)"\n'
         )

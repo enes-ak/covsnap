@@ -2,7 +2,7 @@
 
 import math
 
-from covinspector.metrics import TargetAccumulator
+from covsnap.metrics import TargetAccumulator
 
 
 class TestTargetAccumulator:

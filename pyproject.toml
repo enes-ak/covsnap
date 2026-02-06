@@ -44,8 +44,8 @@ dev = [
 covinspector = "covinspector.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/covinspector/covinspector"
-Repository = "https://github.com/covinspector/covinspector"
+Homepage = "https://github.com/enes-ak/covinspector"
+Repository = "https://github.com/enes-ak/covinspector"
 
 [tool.setuptools.packages.find]
 where = ["src"]

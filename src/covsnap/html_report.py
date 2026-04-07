@@ -39,6 +39,17 @@ def write_html_report(path: str, ctx: ReportContext) -> None:
 _E = html.escape  # shorthand
 
 
+def _format_date(raw: str) -> str:
+    """Convert ISO date like '2026-04-07T11:48:18Z' to '07/04/2026 11:48:18'."""
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S %Z", "%Y-%m-%d %H:%M:%S %Z", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            return dt.strftime("%d/%m/%Y %H:%M:%S")
+        except ValueError:
+            continue
+    return raw
+
+
 def _fmt_region(contig: str, start: int, end: int) -> str:
     return f"{contig}:{start + 1:,}-{end:,}"
 
@@ -112,7 +123,7 @@ def _build_html(ctx: ReportContext) -> str:
     w(f'<h1>covsnap Coverage Report</h1>')
     w('<div class="meta-grid">')
     _meta_item(w, "Tool version", f"covsnap {__version__}")
-    _meta_item(w, "Date", _E(ctx.run_date or ""))
+    _meta_item(w, "Date", _E(_format_date(ctx.run_date or "")))
     _meta_item(w, "Engine", f"{_E(ctx.engine_used)} {_E(ctx.engine_version)}")
     _meta_item(w, "Annotation", f"GENCODE v44 ({BUILD})")
     _meta_item(w, "Input", f"<code>{_E(ctx.bam_path)}</code>")
@@ -265,8 +276,6 @@ def _build_html(ctx: ReportContext) -> str:
                     w(f"<td>{b.mean_depth:.1f}x</td>")
                     w("</tr>")
             w("</tbody></table>")
-            if ctx.lowcov_bed_path:
-                w(f"<p>Full low-coverage BED: <code>{_E(ctx.lowcov_bed_path)}</code></p>")
         else:
             w("<p>No low-coverage blocks detected.</p>")
         w("</section>")

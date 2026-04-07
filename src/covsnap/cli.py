@@ -1,7 +1,7 @@
 """CLI entry point for covsnap.
 
 Orchestrates: argument parsing → input validation → annotation lookup →
-engine execution → classification → output writing.
+engine execution → classification → HTML report writing.
 """
 
 from __future__ import annotations
@@ -26,17 +26,15 @@ from covsnap.annotation import (
     suggest_genes,
     translate_contig,
 )
-from covsnap.bed import BedInterval, enforce_limits, stream_bed_intervals
+from covsnap.bed import enforce_limits
 from covsnap.engines import compute_depth, ensure_index, select_engine
-from covsnap.metrics import TargetResult
-from covsnap.output import write_exon_tsv, write_json, write_lowcov_bed, write_raw_tsv
 from covsnap.html_report import write_html_report
+from covsnap.metrics import TargetResult
 from covsnap.report import (
     ClassifyParams,
     ReportContext,
     classify_exon,
     classify_target,
-    write_report,
 )
 
 logger = logging.getLogger("covsnap")
@@ -53,8 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "covsnap — Coverage inspector for targeted sequencing QC (hg38 only).\n\n"
             "Computes per-target and optionally per-exon depth metrics from BAM/CRAM\n"
-            "files, producing a machine-readable raw TSV and a human-readable\n"
-            "interpreted report with PASS/FAIL classifications."
+            "files, producing an interactive HTML report with PASS/FAIL classifications."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -63,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  covsnap sample.bam chr17:43044295-43125482\n"
             "  covsnap sample.bam --bed targets.bed\n"
             "  covsnap sample.cram BRCA1 --reference hg38.fa --exons\n"
+            "  covsnap sample.bam BRCA1 -o report.html\n"
         ),
     )
 
@@ -127,48 +125,18 @@ def build_parser() -> argparse.ArgumentParser:
     # ── Output options ──
     out = parser.add_argument_group("Output options")
     out.add_argument(
-        "--raw-out",
+        "-o", "--output",
         metavar="FILE",
-        default="covsnap.raw.tsv",
-        help="Raw metrics TSV output path (default: covsnap.raw.tsv).",
-    )
-    out.add_argument(
-        "--report-out",
-        metavar="FILE",
-        default="covsnap.report.md",
-        help="Interpreted report markdown output path (default: covsnap.report.md).",
-    )
-    out.add_argument(
-        "--json-out",
-        metavar="FILE",
-        default=None,
-        help="Optional raw metrics in JSON format.",
-    )
-    out.add_argument(
-        "--html-out",
-        metavar="FILE",
-        default=None,
-        help="Optional interactive HTML report (self-contained, no external dependencies).",
-    )
-    out.add_argument(
-        "--exon-out",
-        metavar="FILE",
-        default="covsnap.exons.tsv",
-        help="Exon-level metrics TSV (default: covsnap.exons.tsv). Only written if --exons.",
+        default="covsnap.report.html",
+        help="HTML report output path (default: covsnap.report.html).",
     )
 
-    # ── Low-coverage output ──
-    lc = parser.add_argument_group("Low-coverage output")
+    # ── Low-coverage options ──
+    lc = parser.add_argument_group("Low-coverage options")
     lc.add_argument(
         "--emit-lowcov",
         action="store_true",
-        help="Enable writing low-coverage BED blocks.",
-    )
-    lc.add_argument(
-        "--lowcov-bed",
-        metavar="FILE",
-        default="covsnap.lowcov.bed",
-        help="Output BED for low-coverage blocks (default: covsnap.lowcov.bed).",
+        help="Include low-coverage blocks in the report.",
     )
     lc.add_argument(
         "--lowcov-threshold",
@@ -558,20 +526,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             exon_list = exon_results_map[r.target_id]
         classify_target(r, params, exon_results=exon_list)
 
-    # ── Write outputs ──
-    # Raw TSV
-    write_raw_tsv(
-        path=args.raw_out,
-        results=results,
-        thresholds=thresholds,
-        engine_used=engine,
-        bam_path=args.alignment,
-        sample_name=sample_name,
-        run_date=run_date,
-    )
-    logger.info("Raw TSV written to %s", args.raw_out)
-
-    # Report markdown
+    # ── Write HTML report ──
     report_ctx = ReportContext(
         results=results,
         engine_used=engine,
@@ -589,63 +544,19 @@ def main(argv: Optional[list[str]] = None) -> None:
         lowcov_threshold=args.lowcov_threshold,
         lowcov_min_len=args.lowcov_min_len,
         emit_lowcov=args.emit_lowcov,
-        lowcov_bed_path=args.lowcov_bed if args.emit_lowcov else "",
         thresholds=thresholds,
         run_date=run_date,
     )
-    write_report(args.report_out, report_ctx)
-    logger.info("Report written to %s", args.report_out)
-
-    # HTML report (optional)
-    if args.html_out:
-        write_html_report(args.html_out, report_ctx)
-        logger.info("HTML report written to %s", args.html_out)
-
-    # JSON (optional)
-    if args.json_out:
-        write_json(
-            path=args.json_out,
-            results=results,
-            thresholds=thresholds,
-            engine_used=engine,
-            bam_path=args.alignment,
-            sample_name=sample_name,
-            run_date=run_date,
-        )
-        logger.info("JSON written to %s", args.json_out)
-
-    # Exon TSV (optional)
-    if args.exons and exon_results_map and exon_metadata_map:
-        for gene, exon_results_list in exon_results_map.items():
-            write_exon_tsv(
-                path=args.exon_out,
-                exon_results=exon_results_list,
-                gene_name=gene,
-                exon_metadata=exon_metadata_map.get(gene, []),
-                run_date=run_date,
-            )
-        logger.info("Exon TSV written to %s", args.exon_out)
-
-    # Low-coverage BED (optional)
-    if args.emit_lowcov:
-        write_lowcov_bed(
-            path=args.lowcov_bed,
-            results=results,
-            lowcov_threshold=args.lowcov_threshold,
-            lowcov_min_len=args.lowcov_min_len,
-        )
-        logger.info("Low-coverage BED written to %s", args.lowcov_bed)
+    write_html_report(args.output, report_ctx)
+    logger.info("HTML report written to %s", args.output)
 
     # ── Summary to stderr ──
     if not args.quiet:
         n_pass = sum(1 for r in results if r.coverage_status == "PASS")
         n_total = len(results)
-        out_parts = [f"Raw: {args.raw_out}", f"Report: {args.report_out}"]
-        if args.html_out:
-            out_parts.append(f"HTML: {args.html_out}")
         print(
             f"[covsnap] Done. {n_pass}/{n_total} targets PASS. "
-            + "  ".join(out_parts),
+            f"Report: {args.output}",
             file=sys.stderr,
         )
 

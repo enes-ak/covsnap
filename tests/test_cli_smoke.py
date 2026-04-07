@@ -339,3 +339,50 @@ class TestCLIBedGuardrails:
                 "--max-targets", "2000",
             ])
         assert exc_info.value.code == 4
+
+
+class TestCLIHtmlOutput:
+    @pytest.fixture(autouse=True)
+    def _samtools(self):
+        _requires_samtools()
+
+    def test_html_output_produced(self, synthetic_bam, tmp_output_dir):
+        raw_out = str(tmp_output_dir / "raw.tsv")
+        report_out = str(tmp_output_dir / "report.md")
+        html_out = str(tmp_output_dir / "report.html")
+
+        main([
+            synthetic_bam,
+            "BRCA1",
+            "--raw-out", raw_out,
+            "--report-out", report_out,
+            "--html-out", html_out,
+            "--engine", "samtools",
+        ])
+
+        assert os.path.isfile(html_out)
+        with open(html_out) as f:
+            html = f.read()
+        assert "<!DOCTYPE html>" in html
+        assert "BRCA1" in html
+        assert "SYNTH_SAMPLE" in html
+
+    def test_html_output_with_bed(self, synthetic_bam, sample_bed, tmp_output_dir):
+        raw_out = str(tmp_output_dir / "raw.tsv")
+        report_out = str(tmp_output_dir / "report.md")
+        html_out = str(tmp_output_dir / "report.html")
+
+        main([
+            synthetic_bam,
+            "--bed", sample_bed,
+            "--raw-out", raw_out,
+            "--report-out", report_out,
+            "--html-out", html_out,
+            "--engine", "samtools",
+        ])
+
+        assert os.path.isfile(html_out)
+        with open(html_out) as f:
+            html = f.read()
+        assert "region_1" in html
+        assert "region_2" in html

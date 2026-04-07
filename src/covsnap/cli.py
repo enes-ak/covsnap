@@ -30,6 +30,7 @@ from covsnap.bed import BedInterval, enforce_limits, stream_bed_intervals
 from covsnap.engines import compute_depth, ensure_index, select_engine
 from covsnap.metrics import TargetResult
 from covsnap.output import write_exon_tsv, write_json, write_lowcov_bed, write_raw_tsv
+from covsnap.html_report import write_html_report
 from covsnap.report import (
     ClassifyParams,
     ReportContext,
@@ -142,6 +143,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         default=None,
         help="Optional raw metrics in JSON format.",
+    )
+    out.add_argument(
+        "--html-out",
+        metavar="FILE",
+        default=None,
+        help="Optional interactive HTML report (self-contained, no external dependencies).",
     )
     out.add_argument(
         "--exon-out",
@@ -589,6 +596,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     write_report(args.report_out, report_ctx)
     logger.info("Report written to %s", args.report_out)
 
+    # HTML report (optional)
+    if args.html_out:
+        write_html_report(args.html_out, report_ctx)
+        logger.info("HTML report written to %s", args.html_out)
+
     # JSON (optional)
     if args.json_out:
         write_json(
@@ -628,9 +640,12 @@ def main(argv: Optional[list[str]] = None) -> None:
     if not args.quiet:
         n_pass = sum(1 for r in results if r.coverage_status == "PASS")
         n_total = len(results)
+        out_parts = [f"Raw: {args.raw_out}", f"Report: {args.report_out}"]
+        if args.html_out:
+            out_parts.append(f"HTML: {args.html_out}")
         print(
             f"[covsnap] Done. {n_pass}/{n_total} targets PASS. "
-            f"Raw: {args.raw_out}  Report: {args.report_out}",
+            + "  ".join(out_parts),
             file=sys.stderr,
         )
 

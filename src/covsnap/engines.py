@@ -295,147 +295,29 @@ def _run_mosdepth(
     tmp_dir: str,
     reference: Optional[str],
 ) -> list[TargetResult]:
-    """Run mosdepth and parse its outputs for full metrics."""
+    """Run mosdepth once and compute all metrics from per-base output."""
     bed_path = _write_tmp_bed(targets, tmp_dir)
     prefix = os.path.join(tmp_dir, "covsnap_mosdepth")
-
-    threshold_str = ",".join(str(t) for t in sorted(thresholds))
 
     cmd = [
         "mosdepth",
         "--by", bed_path,
-        "--thresholds", threshold_str,
         "--threads", str(threads),
-        "--no-per-base",  # We'll do a separate per-base pass
         prefix,
         bam_path,
     ]
     if reference:
         cmd.extend(["--fasta", reference])
 
-    logger.info("Running mosdepth (thresholds): %s", " ".join(cmd))
+    logger.info("Running mosdepth: %s", " ".join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"mosdepth failed (exit {proc.returncode}): {proc.stderr}")
 
-    # Parse thresholds output for pct_ge_X
-    thresholds_file = f"{prefix}.thresholds.bed.gz"
-    threshold_data = _parse_mosdepth_thresholds(thresholds_file, targets, thresholds)
-
-    # Parse regions output for mean depth
-    regions_file = f"{prefix}.regions.bed.gz"
-    mean_depths = _parse_mosdepth_regions(regions_file, targets)
-
-    # Now run mosdepth again WITH per-base to get min/max/median/stdev/lowcov
-    # (removing --no-per-base)
-    cmd_perbase = [
-        "mosdepth",
-        "--by", bed_path,
-        "--threads", str(threads),
-        prefix + "_pb",
-        bam_path,
-    ]
-    if reference:
-        cmd_perbase.extend(["--fasta", reference])
-
-    logger.info("Running mosdepth (per-base): %s", " ".join(cmd_perbase))
-    proc2 = subprocess.run(cmd_perbase, capture_output=True, text=True)
-    if proc2.returncode != 0:
-        raise RuntimeError(f"mosdepth per-base failed (exit {proc2.returncode}): {proc2.stderr}")
-
-    perbase_file = f"{prefix}_pb.per-base.bed.gz"
-    perbase_results = _stream_mosdepth_perbase(
+    perbase_file = f"{prefix}.per-base.bed.gz"
+    return _stream_mosdepth_perbase(
         perbase_file, targets, thresholds, lowcov_threshold, lowcov_min_len,
     )
-
-    # Merge: use thresholds from mosdepth output (more efficient),
-    # but min/max/median/stdev/lowcov from per-base streaming
-    results: list[TargetResult] = []
-    for i, t in enumerate(targets):
-        pb = perbase_results[i]
-        # Override pct_thresholds with mosdepth's exact counts
-        if i < len(threshold_data):
-            pb.pct_thresholds = threshold_data[i]
-            pb.pct_zero = round(
-                (1.0 - threshold_data[i].get(1, 0) / 100.0) * 100, 2
-            ) if 1 in threshold_data[i] else pb.pct_zero
-        # Override mean_depth with mosdepth's value
-        if i < len(mean_depths):
-            pb.mean_depth = mean_depths[i]
-        results.append(pb)
-
-    return results
-
-
-def _parse_mosdepth_thresholds(
-    path: str,
-    targets: list[_TargetSpec],
-    thresholds: list[int],
-) -> list[dict[int, float]]:
-    """Parse mosdepth thresholds.bed.gz for per-target threshold percentages."""
-    results: list[dict[int, float]] = []
-    if not os.path.exists(path):
-        logger.warning("mosdepth thresholds file not found: %s", path)
-        return results
-
-    with gzip.open(path, "rt") as fh:
-        for line in fh:
-            if line.startswith("#"):
-                continue
-            parts = line.rstrip("\n").split("\t")
-            if len(parts) < 4:
-                continue
-            # parts: chrom, start, end, [name,] T1_count, T2_count, ...
-            # mosdepth thresholds output: each value is the number of bases >= threshold
-            contig = parts[0]
-            start = int(parts[1])
-            end = int(parts[2])
-            length = end - start
-
-            # Values start at index 4 if there's a name column, else index 3
-            # Detect by checking if we have enough numeric columns
-            val_start = 3
-            if len(parts) > 3 and not parts[3].replace(".", "").isdigit():
-                val_start = 4
-
-            pct_map: dict[int, float] = {}
-            for j, t in enumerate(sorted(thresholds)):
-                idx = val_start + j
-                if idx < len(parts):
-                    try:
-                        count = float(parts[idx])
-                        pct_map[t] = round(count / length * 100, 2) if length > 0 else 0.0
-                    except ValueError:
-                        pct_map[t] = 0.0
-                else:
-                    pct_map[t] = 0.0
-            results.append(pct_map)
-
-    return results
-
-
-def _parse_mosdepth_regions(
-    path: str,
-    targets: list[_TargetSpec],
-) -> list[float]:
-    """Parse mosdepth regions.bed.gz for mean depths."""
-    means: list[float] = []
-    if not os.path.exists(path):
-        logger.warning("mosdepth regions file not found: %s", path)
-        return means
-
-    with gzip.open(path, "rt") as fh:
-        for line in fh:
-            if line.startswith("#"):
-                continue
-            parts = line.rstrip("\n").split("\t")
-            # Last column is mean depth
-            try:
-                means.append(round(float(parts[-1]), 2))
-            except (ValueError, IndexError):
-                means.append(0.0)
-
-    return means
 
 
 def _stream_mosdepth_perbase(

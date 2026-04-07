@@ -120,3 +120,25 @@ class TestMosdepthEngine:
         r = results[0]
         assert r.mean_depth >= 0
         assert r.length_bp == 5706
+
+    def test_single_pass_metrics_complete(self, synthetic_bam, tmp_output_dir):
+        """Verify mosdepth produces all metrics (thresholds, mean, etc.) from single pass."""
+        results = compute_depth(
+            bam_path=synthetic_bam,
+            regions=[("chr17", 43044294, 43050000, "test_region")],
+            engine="mosdepth",
+            thresholds=[1, 5, 10, 20, 30, 50, 100],
+            threads=2,
+            tmp_dir=str(tmp_output_dir),
+        )
+        assert len(results) == 1
+        r = results[0]
+        for t in [1, 5, 10, 20, 30, 50, 100]:
+            assert t in r.pct_thresholds, f"Missing threshold {t}"
+            assert 0 <= r.pct_thresholds[t] <= 100
+        assert isinstance(r.mean_depth, float)
+        assert r.min_depth >= 0
+        assert r.max_depth >= r.min_depth
+        assert isinstance(r.median_depth, float)
+        assert isinstance(r.stdev_depth, float)
+        assert r.stdev_depth >= 0

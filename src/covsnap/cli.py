@@ -57,11 +57,14 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  covsnap sample.bam BRCA1\n"
-            "  covsnap sample.bam chr17:43044295-43125482\n"
-            "  covsnap sample.bam --bed targets.bed\n"
-            "  covsnap sample.cram BRCA1 --reference hg38.fa --exons\n"
-            "  covsnap sample.bam BRCA1 -o report.html\n"
+            "  covsnap sample.bam BRCA1                              # gene mode\n"
+            "  covsnap sample.bam BRCA1 --exons                      # gene + exon breakdown\n"
+            "  covsnap sample.bam chr17:43044295-43125482             # region mode (auto-finds genes & exons)\n"
+            "  covsnap sample.bam --bed targets.bed                   # BED mode\n"
+            "  covsnap sample.bam BRCA1 -o my_report.html             # custom output path\n"
+            "  covsnap sample.cram BRCA1 --reference hg38.fa          # CRAM input\n"
+            "  covsnap sample.bam BRCA1 --emit-lowcov                 # include low-coverage blocks\n"
+            "  covsnap sample.bam BRCA1 --engine samtools --threads 8 # engine selection\n"
         ),
     )
 

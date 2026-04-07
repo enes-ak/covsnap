@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -123,7 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=4,
         metavar="N",
-        help="Threads for mosdepth (default: 4).",
+        help="Parallel workers for samtools / threads for mosdepth (default: 4).",
     )
 
     # ── Output options ──
@@ -567,18 +568,19 @@ def main(argv: Optional[list[str]] = None) -> None:
                 gene_results_list = gene_depth_results
                 gene_metadata_list = overlapping_genes
 
-                # Per-gene exon analysis
+                # Per-gene exon analysis (parallel)
                 exon_results_map = exon_results_map or {}
                 exon_metadata_map = exon_metadata_map or {}
                 exon_status_map = exon_status_map or {}
                 params = _build_classify_params(args)
 
+                # Prepare exon jobs
+                exon_jobs: list[tuple[str, list[tuple[str, int, int, str]], list[dict[str, Any]]]] = []
                 for g_info in overlapping_genes:
                     gname = g_info["gene_name"]
                     exon_records = lookup_exons(gname)
                     if not exon_records:
                         continue
-                    # Clip exons to the input region
                     clipped_exon_regions = []
                     clipped_exon_records = []
                     for e in exon_records:
@@ -591,28 +593,40 @@ def main(argv: Optional[list[str]] = None) -> None:
                                 e.get("exon_id", f"exon_{e['exon_number']}"),
                             ))
                             clipped_exon_records.append(e)
-                    if not clipped_exon_regions:
-                        continue
-                    try:
-                        exon_depth = compute_depth(
-                            bam_path=args.alignment,
-                            regions=clipped_exon_regions,
-                            engine=engine,
-                            thresholds=thresholds,
-                            lowcov_threshold=args.lowcov_threshold,
-                            lowcov_min_len=args.lowcov_min_len,
-                            threads=args.threads,
-                            reference=args.reference,
-                        )
-                        for er in exon_depth:
-                            er.engine_used = engine
-                            er.bam_path = args.alignment
-                            er.sample_name = sample_name
-                        exon_results_map[gname] = exon_depth
-                        exon_metadata_map[gname] = clipped_exon_records
-                        exon_status_map[gname] = [classify_exon(er, params) for er in exon_depth]
-                    except RuntimeError as exc:
-                        logger.warning("Exon analysis failed for %s: %s", gname, exc)
+                    if clipped_exon_regions:
+                        exon_jobs.append((gname, clipped_exon_regions, clipped_exon_records))
+
+                if exon_jobs:
+                    n_workers = min(args.threads, len(exon_jobs))
+                    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                        futures = {}
+                        for gname, exon_regs, exon_recs in exon_jobs:
+                            future = pool.submit(
+                                compute_depth,
+                                bam_path=args.alignment,
+                                regions=exon_regs,
+                                engine=engine,
+                                thresholds=thresholds,
+                                lowcov_threshold=args.lowcov_threshold,
+                                lowcov_min_len=args.lowcov_min_len,
+                                threads=1,  # each worker gets 1 thread
+                                reference=args.reference,
+                            )
+                            futures[future] = (gname, exon_recs)
+
+                        for future in as_completed(futures):
+                            gname, exon_recs = futures[future]
+                            try:
+                                exon_depth = future.result()
+                                for er in exon_depth:
+                                    er.engine_used = engine
+                                    er.bam_path = args.alignment
+                                    er.sample_name = sample_name
+                                exon_results_map[gname] = exon_depth
+                                exon_metadata_map[gname] = exon_recs
+                                exon_status_map[gname] = [classify_exon(er, params) for er in exon_depth]
+                            except RuntimeError as exc:
+                                logger.warning("Exon analysis failed for %s: %s", gname, exc)
             except RuntimeError as exc:
                 logger.warning("Gene-level analysis failed: %s", exc)
         else:

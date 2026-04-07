@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import gzip
 import logging
+import math
 import os
 import shutil
 import subprocess
 import tempfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional
 
 from covsnap.metrics import TargetAccumulator, TargetResult
@@ -137,7 +139,7 @@ def compute_depth(
     lowcov_min_len : int
         Minimum contiguous length for a low-cov block.
     threads : int
-        Threads for mosdepth.
+        Number of parallel workers for samtools, threads for mosdepth.
     tmp_dir : str or None
         Temporary directory (auto-created if None).
     reference : str or None
@@ -155,9 +157,9 @@ def compute_depth(
 
     try:
         if engine == "samtools":
-            return _run_samtools(
+            return _run_samtools_parallel(
                 bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
-                tmp_dir, reference,
+                threads, tmp_dir, reference,
             )
         elif engine == "mosdepth":
             return _run_mosdepth(
@@ -182,11 +184,93 @@ def _cleanup_dir(path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# samtools depth engine
+# samtools depth engine — parallel
 # ---------------------------------------------------------------------------
 
 
-def _run_samtools(
+def _run_samtools_parallel(
+    bam_path: str,
+    targets: list[_TargetSpec],
+    thresholds: list[int],
+    lowcov_threshold: int,
+    lowcov_min_len: int,
+    threads: int,
+    tmp_dir: str,
+    reference: Optional[str],
+) -> list[TargetResult]:
+    """Run samtools depth in parallel chunks for multiple regions.
+
+    When there are multiple targets and threads > 1, splits targets
+    into chunks and runs a separate samtools depth process per chunk.
+    Each chunk handles a subset of non-overlapping regions, and results
+    are merged back in original order.
+    """
+    n_targets = len(targets)
+    workers = min(threads, n_targets)
+
+    if workers <= 1 or n_targets <= 1:
+        return _run_samtools_chunk(
+            bam_path, targets, thresholds, lowcov_threshold, lowcov_min_len,
+            tmp_dir, reference,
+        )
+
+    # Split targets into chunks, preserving original indices
+    indexed_targets = list(enumerate(targets))
+    chunk_size = math.ceil(n_targets / workers)
+    chunks = [
+        indexed_targets[i:i + chunk_size]
+        for i in range(0, n_targets, chunk_size)
+    ]
+
+    logger.info("Parallel samtools: %d chunks across %d workers", len(chunks), workers)
+
+    results = [None] * n_targets  # type: ignore[list-item]
+
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        futures = {}
+        for ci, chunk in enumerate(chunks):
+            chunk_specs = [t for _, t in chunk]
+            chunk_indices = [i for i, _ in chunk]
+            chunk_tmp = os.path.join(tmp_dir, f"chunk_{ci}")
+            os.makedirs(chunk_tmp, exist_ok=True)
+            # Serialize specs for subprocess
+            chunk_regions = [
+                (s.contig, s.start, s.end, s.target_id) for s in chunk_specs
+            ]
+            future = pool.submit(
+                _samtools_chunk_worker,
+                bam_path, chunk_regions, thresholds,
+                lowcov_threshold, lowcov_min_len, chunk_tmp, reference,
+            )
+            futures[future] = chunk_indices
+
+        for future in as_completed(futures):
+            chunk_indices = futures[future]
+            chunk_results = future.result()
+            for idx, result in zip(chunk_indices, chunk_results):
+                results[idx] = result
+
+    return results  # type: ignore[return-value]
+
+
+def _samtools_chunk_worker(
+    bam_path: str,
+    regions: list[tuple[str, int, int, str]],
+    thresholds: list[int],
+    lowcov_threshold: int,
+    lowcov_min_len: int,
+    tmp_dir: str,
+    reference: Optional[str],
+) -> list[TargetResult]:
+    """Worker function for parallel samtools execution."""
+    specs = _make_target_specs(regions)
+    return _run_samtools_chunk(
+        bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
+        tmp_dir, reference,
+    )
+
+
+def _run_samtools_chunk(
     bam_path: str,
     targets: list[_TargetSpec],
     thresholds: list[int],
@@ -195,7 +279,7 @@ def _run_samtools(
     tmp_dir: str,
     reference: Optional[str],
 ) -> list[TargetResult]:
-    """Stream ``samtools depth -a`` output and accumulate metrics."""
+    """Stream ``samtools depth -a`` output and accumulate metrics for one chunk."""
     # Sort targets by contig and start for cursor-based parsing
     sorted_targets = sorted(targets, key=lambda t: (t.contig, t.start))
     # Keep original order mapping for output
@@ -230,9 +314,6 @@ def _run_samtools(
         for t in sorted_targets
     ]
 
-    # Build an index: (contig, start, end) → accumulator index
-    # for fast lookup. Since targets are sorted and non-overlapping,
-    # we use a cursor.
     cursor = 0
     n_targets = len(sorted_targets)
 

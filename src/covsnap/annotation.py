@@ -412,6 +412,63 @@ def lookup_gene(gene_name: str) -> Optional[dict[str, Any]]:
     return None
 
 
+def lookup_genes_in_region(
+    contig: str, start: int, end: int,
+) -> list[dict[str, Any]]:
+    """Find all genes overlapping a genomic region.
+
+    Tries the full tabix index first, then falls back to the built-in dict.
+    Returns a list of gene dicts sorted by start position.
+
+    Each dict: contig, start, end, strand, gene_name, gene_id, gene_type.
+    """
+    genes: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    # Ensure contig is chr-style for index queries
+    query_contig = contig if contig.startswith("chr") else f"chr{contig}"
+
+    # Try full tabix index
+    tbx = _load_tabix_index()
+    if tbx is not None:
+        try:
+            for row in tbx.fetch(query_contig, start, end):
+                fields = row.split("\t")
+                if len(fields) >= 7:
+                    name = fields[3]
+                    if name in seen:
+                        continue
+                    gene_start = int(fields[1])
+                    gene_end = int(fields[2])
+                    # Check actual overlap
+                    if gene_start < end and gene_end > start:
+                        seen.add(name)
+                        genes.append({
+                            "contig": fields[0],
+                            "start": gene_start,
+                            "end": gene_end,
+                            "gene_name": name,
+                            "gene_id": fields[4],
+                            "strand": fields[5],
+                            "gene_type": fields[6],
+                        })
+        except ValueError:
+            logger.debug("Region %s:%d-%d not in tabix contigs", query_contig, start, end)
+
+    # Fallback / supplement with built-in dict
+    for name, info in _BUILTIN_GENES.items():
+        if name in seen:
+            continue
+        if info["contig"] == query_contig and info["start"] < end and info["end"] > start:
+            seen.add(name)
+            record = dict(info)
+            record["gene_name"] = name
+            genes.append(record)
+
+    genes.sort(key=lambda g: g["start"])
+    return genes
+
+
 def suggest_genes(gene_name: str, n: int = 5) -> list[str]:
     """Return up to *n* close matches for a possibly-misspelled gene name."""
     query = gene_name.strip().upper()

@@ -226,6 +226,37 @@ def _build_html(ctx: ReportContext) -> str:
         w("</div>")
     w("</section>")
 
+    # ── Gene-level results (region mode) ──
+    if ctx.gene_results:
+        w('<section class="section">')
+        w("<h2>Genes in Region</h2>")
+        w(f"<p>{len(ctx.gene_results)} gene(s) found overlapping the queried region.</p>")
+        w('<table class="data-table sortable" id="geneTable">')
+        w("<thead><tr>")
+        w("<th>Gene</th><th>Region</th><th>Length</th><th>Mean</th><th>Median</th>")
+        w("<th>%&ge;20x</th><th>%Zero</th><th>Status</th>")
+        w("</tr></thead><tbody>")
+        for i, gr in enumerate(ctx.gene_results):
+            meta = ctx.gene_metadata[i] if ctx.gene_metadata and i < len(ctx.gene_metadata) else {}
+            pct20 = gr.pct_thresholds.get(20, 0.0)
+            gene_type = meta.get("gene_type", "")
+            strand = meta.get("strand", "")
+            w("<tr>")
+            w(f"<td><strong>{_E(gr.target_id)}</strong>")
+            if gene_type or strand:
+                w(f" <small style=\"color:var(--secondary)\">({_E(gene_type)}, {_E(strand)})</small>")
+            w("</td>")
+            w(f"<td>{_E(_fmt_region(gr.contig, gr.start, gr.end))}</td>")
+            w(f"<td>{gr.length_bp:,} bp</td>")
+            w(f"<td>{gr.mean_depth:.2f}</td>")
+            w(f"<td>{gr.median_depth:.0f}</td>")
+            w(f"<td>{pct20:.2f}%</td>")
+            w(f"<td>{gr.pct_zero:.2f}%</td>")
+            w(f'<td><span class="badge badge-{_E(gr.coverage_status)}">{_E(gr.coverage_status)}</span></td>')
+            w("</tr>")
+        w("</tbody></table>")
+        w("</section>")
+
     # ── Exon-level results ──
     if ctx.exon_results:
         w('<section class="section">')

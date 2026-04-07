@@ -136,6 +136,9 @@ class ReportContext:
     lowcov_bed_path: str = ""
     thresholds: list[int] = field(default_factory=lambda: [1, 5, 10, 20, 30, 50, 100])
     run_date: Optional[str] = None
+    # Gene-level results for region mode (region → overlapping genes)
+    gene_results: Optional[list[TargetResult]] = None
+    gene_metadata: Optional[list[dict[str, Any]]] = None
 
 
 # ---------------------------------------------------------------------------

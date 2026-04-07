@@ -22,6 +22,7 @@ from covsnap.annotation import (
     is_region_string,
     lookup_exons,
     lookup_gene,
+    lookup_genes_in_region,
     parse_region,
     suggest_genes,
     translate_contig,
@@ -518,6 +519,102 @@ def main(argv: Optional[list[str]] = None) -> None:
                 gene_name_resolved,
             )
 
+    # ── Region → gene/exon overlay (region mode) ──
+    gene_results_list: Optional[list[TargetResult]] = None
+    gene_metadata_list: Optional[list[dict[str, Any]]] = None
+
+    is_region_mode = (args.target is not None and is_region_string(args.target)
+                      and gene_name_resolved is None)
+
+    if is_region_mode and len(regions) == 1:
+        reg_contig, reg_start, reg_end, _ = regions[0]
+        # Find overlapping genes using chr-style contig for annotation lookup
+        chr_contig = translate_contig(reg_contig, "chr")
+        overlapping_genes = lookup_genes_in_region(chr_contig, reg_start, reg_end)
+
+        if overlapping_genes:
+            logger.info("Found %d gene(s) in region", len(overlapping_genes))
+
+            # Compute gene-level coverage
+            gene_regions = [
+                (
+                    translate_contig(g["contig"], contig_style),
+                    max(g["start"], reg_start),  # clip to input region
+                    min(g["end"], reg_end),
+                    g["gene_name"],
+                )
+                for g in overlapping_genes
+            ]
+            try:
+                gene_depth_results = compute_depth(
+                    bam_path=args.alignment,
+                    regions=gene_regions,
+                    engine=engine,
+                    thresholds=thresholds,
+                    lowcov_threshold=args.lowcov_threshold,
+                    lowcov_min_len=args.lowcov_min_len,
+                    threads=args.threads,
+                    reference=args.reference,
+                )
+                for gr in gene_depth_results:
+                    gr.engine_used = engine
+                    gr.bam_path = args.alignment
+                    gr.sample_name = sample_name
+
+                gene_results_list = gene_depth_results
+                gene_metadata_list = overlapping_genes
+
+                # Per-gene exon analysis
+                exon_results_map = exon_results_map or {}
+                exon_metadata_map = exon_metadata_map or {}
+                exon_status_map = exon_status_map or {}
+                params = _build_classify_params(args)
+
+                for g_info in overlapping_genes:
+                    gname = g_info["gene_name"]
+                    exon_records = lookup_exons(gname)
+                    if not exon_records:
+                        continue
+                    # Clip exons to the input region
+                    clipped_exon_regions = []
+                    clipped_exon_records = []
+                    for e in exon_records:
+                        e_start = max(e["start"], reg_start)
+                        e_end = min(e["end"], reg_end)
+                        if e_start < e_end:
+                            clipped_exon_regions.append((
+                                translate_contig(e["contig"], contig_style),
+                                e_start, e_end,
+                                e.get("exon_id", f"exon_{e['exon_number']}"),
+                            ))
+                            clipped_exon_records.append(e)
+                    if not clipped_exon_regions:
+                        continue
+                    try:
+                        exon_depth = compute_depth(
+                            bam_path=args.alignment,
+                            regions=clipped_exon_regions,
+                            engine=engine,
+                            thresholds=thresholds,
+                            lowcov_threshold=args.lowcov_threshold,
+                            lowcov_min_len=args.lowcov_min_len,
+                            threads=args.threads,
+                            reference=args.reference,
+                        )
+                        for er in exon_depth:
+                            er.engine_used = engine
+                            er.bam_path = args.alignment
+                            er.sample_name = sample_name
+                        exon_results_map[gname] = exon_depth
+                        exon_metadata_map[gname] = clipped_exon_records
+                        exon_status_map[gname] = [classify_exon(er, params) for er in exon_depth]
+                    except RuntimeError as exc:
+                        logger.warning("Exon analysis failed for %s: %s", gname, exc)
+            except RuntimeError as exc:
+                logger.warning("Gene-level analysis failed: %s", exc)
+        else:
+            logger.info("No genes found in region %s:%d-%d", chr_contig, reg_start, reg_end)
+
     # ── Classify targets ──
     params = _build_classify_params(args)
     for r in results:
@@ -525,6 +622,12 @@ def main(argv: Optional[list[str]] = None) -> None:
         if exon_results_map and r.target_id in exon_results_map:
             exon_list = exon_results_map[r.target_id]
         classify_target(r, params, exon_results=exon_list)
+
+    # Classify genes if present
+    if gene_results_list:
+        for gr in gene_results_list:
+            gene_exons = exon_results_map.get(gr.target_id) if exon_results_map else None
+            classify_target(gr, params, exon_results=gene_exons)
 
     # ── Write HTML report ──
     report_ctx = ReportContext(
@@ -537,15 +640,17 @@ def main(argv: Optional[list[str]] = None) -> None:
         reference=args.reference,
         bed_path=args.bed,
         bed_guardrail_message=bed_guardrail_message,
-        exon_results=exon_results_map,
-        exon_metadata=exon_metadata_map,
-        exon_statuses=exon_status_map,
+        exon_results=exon_results_map if exon_results_map else None,
+        exon_metadata=exon_metadata_map if exon_metadata_map else None,
+        exon_statuses=exon_status_map if exon_status_map else None,
         classify_params=params,
         lowcov_threshold=args.lowcov_threshold,
         lowcov_min_len=args.lowcov_min_len,
         emit_lowcov=args.emit_lowcov,
         thresholds=thresholds,
         run_date=run_date,
+        gene_results=gene_results_list,
+        gene_metadata=gene_metadata_list,
     )
     write_html_report(args.output, report_ctx)
     logger.info("HTML report written to %s", args.output)

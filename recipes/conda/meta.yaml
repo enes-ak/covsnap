@@ -1,5 +1,5 @@
 {% set name = "covsnap" %}
-{% set version = "0.1.0" %}
+{% set version = "0.2.0" %}
 
 package:
   name: {{ name }}
@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://github.com/enes-ak/covsnap/archive/v{{ version }}.tar.gz
-  sha256: e5a5f0d0d287b0d6fb4890d80812aba10f56f10cf5f2444d06af95a43659f80e
+  sha256: PLACEHOLDER
 
 build:
   number: 0
@@ -40,24 +40,22 @@ test:
     - covsnap.cli
     - covsnap.engines
     - covsnap.annotation
+    - covsnap.html_report
   requires:
     - pytest
     - samtools
   source_files:
     - recipes/conda/test_generate_bam.py
-    - recipes/conda/test_verify_tsv.py
-    - recipes/conda/test_verify_report.py
+    - recipes/conda/test_verify_html.py
   commands:
     - covsnap --version
     - python recipes/conda/test_generate_bam.py
-    - covsnap test_sorted.bam BRCA1 --raw-out test_raw.tsv --report-out test_report.md --engine samtools
-    - test -f test_raw.tsv
-    - test -f test_report.md
-    - python recipes/conda/test_verify_tsv.py
-    - python recipes/conda/test_verify_report.py
-    - covsnap test_sorted.bam chr17:43044295-43125482 --raw-out test_region.tsv --report-out test_region.md --engine samtools
-    - test -f test_region.tsv
-    - rm -f test_sorted.bam test_sorted.bam.bai test_raw.tsv test_report.md test_region.tsv test_region.md
+    - covsnap test_sorted.bam BRCA1 -o test_report.html --engine samtools
+    - test -f test_report.html
+    - python recipes/conda/test_verify_html.py
+    - covsnap test_sorted.bam chr17:43044295-43125482 -o test_region.html --engine samtools
+    - test -f test_region.html
+    - rm -f test_sorted.bam test_sorted.bam.bai test_report.html test_region.html
 
 about:
   home: https://github.com/enes-ak/covsnap
@@ -67,8 +65,8 @@ about:
   summary: Coverage inspector for targeted sequencing QC (hg38)
   description: |
     covsnap computes per-target and per-exon depth metrics from
-    BAM/CRAM files, producing a machine-readable raw TSV and a
-    human-readable interpreted report with PASS/FAIL classifications.
+    BAM/CRAM files, producing an interactive HTML report with
+    PASS/FAIL classifications and visual coverage summaries.
     Supports gene symbols, genomic regions, and BED files as input.
     Ships with a bundled GENCODE v44 hg38 gene index — no internet
     or GTF files required at runtime.

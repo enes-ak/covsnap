@@ -437,8 +437,9 @@ def _meta_item(w, label: str, value: str) -> None:
 
 
 def _summary_card(w, title: str, value: str, color: str) -> None:
+    long_cls = " sc-value-long" if len(value) > 6 else ""
     w(f'<div class="summary-card sc-{color}">'
-      f'<div class="sc-value">{value}</div>'
+      f'<div class="sc-value{long_cls}">{value}</div>'
       f'<div class="sc-title">{title}</div></div>')
 
 
@@ -499,7 +500,7 @@ body {
 /* Summary cards */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   margin: 28px 0;
 }
@@ -511,7 +512,8 @@ body {
   border-left: 4px solid var(--secondary);
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
-.sc-value { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.sc-value { font-size: 1.5rem; font-weight: 700; color: var(--text); white-space: nowrap; line-height: 1.2; }
+.sc-value.sc-value-long { font-size: 0.95rem; }
 .sc-title { font-size: 0.78rem; color: var(--text-light); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 .sc-primary  { border-left-color: var(--primary); }
 .sc-secondary { border-left-color: var(--secondary); }
@@ -829,17 +831,32 @@ _JS = r"""
       var pct = Math.min(d.pct20, 100);
       fill.style.width = pct + "%";
 
-      // Color: teal (good) -> amber (warning) -> red (poor)
-      var color;
-      if (pct >= 95) {
-        color = "#0D9488";      // teal
-      } else if (pct >= 80) {
-        color = "#0EA5E9";      // sky — transition
-      } else if (pct >= 50) {
-        color = "#D97706";      // amber
+      // Smooth color gradient using HSL interpolation
+      // 0% → hsl(0, 65%, 45%)   deep red
+      // 50% → hsl(35, 75%, 48%)  amber
+      // 80% → hsl(168, 60%, 40%) muted teal
+      // 100% → hsl(173, 80%, 30%) deep teal (matches --primary)
+      var h, s, l;
+      if (pct <= 50) {
+        // red → amber (hue 0 → 35)
+        var t = pct / 50;
+        h = 0 + t * 35;
+        s = 65 + t * 10;
+        l = 45 + t * 3;
+      } else if (pct <= 80) {
+        // amber → muted teal (hue 35 → 168)
+        var t = (pct - 50) / 30;
+        h = 35 + t * 133;
+        s = 75 - t * 15;
+        l = 48 - t * 8;
       } else {
-        color = "#DC2626";      // red
+        // muted teal → deep teal (hue 168 → 173)
+        var t = (pct - 80) / 20;
+        h = 168 + t * 5;
+        s = 60 + t * 20;
+        l = 40 - t * 10;
       }
+      var color = "hsl(" + Math.round(h) + "," + Math.round(s) + "%," + Math.round(l) + "%)";
       fill.style.background = color;
 
       track.appendChild(fill);
@@ -848,7 +865,7 @@ _JS = r"""
       var pctLabel = document.createElement("div");
       pctLabel.className = "exon-bar-pct";
       pctLabel.textContent = d.pct20.toFixed(1) + "%";
-      pctLabel.style.color = color;
+      pctLabel.style.color = "hsl(" + Math.round(h) + "," + Math.round(s) + "%," + Math.round(Math.max(l - 8, 20)) + "%)";
       row.appendChild(pctLabel);
 
       // Tooltip on hover

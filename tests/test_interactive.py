@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from covsnap.cli import main
 from covsnap.interactive import collect_inputs
 
 
@@ -179,3 +180,14 @@ class TestUserCancellation:
 
         result = collect_inputs()
         assert result is None
+
+
+class TestCLINoArgsTriggersInteractive:
+    @patch("covsnap.cli.collect_inputs")
+    def test_no_args_calls_interactive(self, mock_collect):
+        """covsnap with no args should call collect_inputs."""
+        mock_collect.return_value = None  # simulate Ctrl-C
+        with pytest.raises(SystemExit) as exc_info:
+            main([])
+        mock_collect.assert_called_once()
+        assert exc_info.value.code == 0

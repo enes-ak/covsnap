@@ -41,6 +41,11 @@ from covsnap.report import (
 
 logger = logging.getLogger("covsnap")
 
+try:
+    from covsnap.interactive import collect_inputs
+except ImportError:  # questionary not installed
+    collect_inputs = None  # type: ignore[assignment]
+
 
 # ---------------------------------------------------------------------------
 # Argument parser
@@ -325,6 +330,39 @@ def _get_engine_version(engine: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Interactive mode
+# ---------------------------------------------------------------------------
+
+
+def _run_interactive() -> None:
+    """Launch interactive mode and run the pipeline with collected inputs."""
+    if collect_inputs is None:
+        print(
+            "[covsnap] ERROR: Interactive mode requires 'questionary'. "
+            "Install it with: pip install questionary",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    args = collect_inputs()
+    if args is None:
+        print("\n[covsnap] Cancelled.", file=sys.stderr)
+        sys.exit(0)
+
+    if not hasattr(args, "pct_thresholds"):
+        args.pct_thresholds = "1,5,10,20,30,50,100"
+
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="[covsnap] %(levelname)s: %(message)s",
+        stream=sys.stderr,
+    )
+
+    _validate_args(args)
+    _run_pipeline(args)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -332,6 +370,17 @@ def _get_engine_version(engine: str) -> str:
 def main(argv: Optional[list[str]] = None) -> None:
     """CLI entry point."""
     parser = build_parser()
+
+    # No arguments → interactive mode
+    if argv is not None and len(argv) == 0:
+        _run_interactive()
+        return
+    if argv is None:
+        import sys as _sys
+        if len(_sys.argv) == 1:
+            _run_interactive()
+            return
+
     args = parser.parse_args(argv)
 
     # ── Logging setup ──
@@ -352,6 +401,11 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     # ── Validate ──
     _validate_args(args)
+    _run_pipeline(args)
+
+
+def _run_pipeline(args: argparse.Namespace) -> None:
+    """Execute the coverage pipeline for already-validated args."""
     thresholds: list[int] = args._parsed_thresholds  # type: ignore[attr-defined]
 
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

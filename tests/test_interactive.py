@@ -23,6 +23,7 @@ class TestCollectInputsGeneMode:
             "auto",               # engine
             "covsnap.report.html",  # output path (accept default)
             False,                # no advanced settings
+            True,                 # confirm run
         ])
 
         def make_ask():
@@ -55,6 +56,7 @@ class TestCollectInputsRegionMode:
             "auto",
             "covsnap.report.html",
             False,
+            True,                 # confirm run
         ])
 
         def make_ask():
@@ -83,6 +85,7 @@ class TestCollectInputsBEDMode:
             "samtools",
             "my_report.html",
             False,
+            True,                 # confirm run
         ])
 
         def make_ask():
@@ -119,6 +122,7 @@ class TestCollectInputsAdvanced:
             "3.0",              # dropout_pct_zero
             "0.8",              # uneven_cv
             "8",                # threads
+            True,               # confirm run
         ])
 
         def make_ask():
@@ -155,6 +159,7 @@ class TestCollectInputsCRAM:
             "auto",
             "covsnap.report.html",
             False,
+            True,                   # confirm run
         ])
 
         def make_ask():
@@ -180,6 +185,38 @@ class TestUserCancellation:
 
         result = collect_inputs()
         assert result is None
+
+
+class TestSummaryDisplay:
+    @patch("covsnap.interactive.questionary")
+    def test_summary_shown_before_run(self, mock_q, capsys):
+        """collect_inputs should print a summary before final confirmation."""
+        answers = iter([
+            "/data/sample.bam",
+            "Gene symbol",
+            "BRCA1",
+            False,
+            "auto",
+            "covsnap.report.html",
+            False,              # no advanced
+            True,               # confirm run
+        ])
+
+        def make_ask():
+            val = next(answers)
+            return type("Mock", (), {"ask": lambda self: val})()
+
+        mock_q.path.side_effect = lambda *a, **kw: make_ask()
+        mock_q.select.side_effect = lambda *a, **kw: make_ask()
+        mock_q.text.side_effect = lambda *a, **kw: make_ask()
+        mock_q.confirm.side_effect = lambda *a, **kw: make_ask()
+
+        ns = collect_inputs()
+
+        captured = capsys.readouterr()
+        assert "sample.bam" in captured.out
+        assert "BRCA1" in captured.out
+        assert ns is not None
 
 
 class TestCLINoArgsTriggersInteractive:

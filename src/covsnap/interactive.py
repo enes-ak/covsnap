@@ -158,7 +158,35 @@ def collect_inputs() -> Optional[argparse.Namespace]:
     if advanced:
         settings.update(_collect_advanced(mode))
 
+    _print_summary(settings)
+
+    confirm = _ask(questionary.confirm("Run analysis?", default=True))
+    if not confirm:
+        return None
+
     return argparse.Namespace(**settings)
+
+
+def _print_summary(settings: dict) -> None:
+    """Print a summary of collected settings."""
+    print("\n" + "=" * 50)
+    print("  Run Summary")
+    print("=" * 50)
+    print(f"  Alignment:  {settings['alignment']}")
+    if settings.get('target'):
+        print(f"  Target:     {settings['target']}")
+    if settings.get('bed'):
+        print(f"  BED file:   {settings['bed']}")
+    if settings.get('reference'):
+        print(f"  Reference:  {settings['reference']}")
+    print(f"  Exons:      {'yes' if settings.get('exons') else 'no'}")
+    print(f"  Engine:     {settings['engine']}")
+    print(f"  Output:     {settings['output']}")
+    if settings.get('emit_lowcov'):
+        print(f"  Low-cov:    threshold={settings['lowcov_threshold']}, min_len={settings['lowcov_min_len']}")
+    if settings.get('threads', 4) != 4:
+        print(f"  Threads:    {settings['threads']}")
+    print("=" * 50 + "\n")
 
 
 def _collect_advanced(mode: str) -> dict:

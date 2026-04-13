@@ -82,8 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         default=None,
         help=(
-            "Gene symbol (e.g. BRCA1) or genomic region "
-            "(e.g. chr17:43044295-43125482). Mutually exclusive with --bed."
+            "Gene symbol (e.g. BRCA1) or comma-separated list (e.g. BRCA1,TP53) "
+            "or genomic region (e.g. chr17:43044295-43125482). "
+            "Mutually exclusive with --bed."
         ),
     )
 
@@ -431,7 +432,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
     # ── Resolve targets ──
     # regions: list of (contig, start, end, name) in BAM contig style
     regions: list[tuple[str, int, int, str]] = []
-    gene_name_resolved: Optional[str] = None
+    gene_names_resolved: list[str] = []
     bed_guardrail_message = ""
 
     if args.bed is not None:
@@ -470,25 +471,28 @@ def _run_pipeline(args: argparse.Namespace) -> None:
             )
             return
         else:
-            # Gene mode
-            gene_info = lookup_gene(args.target)
-            if gene_info is None:
-                suggestions = suggest_genes(args.target)
-                suggestion_str = ", ".join(suggestions) if suggestions else "(no close matches)"
-                _error(
-                    f"Gene '{args.target}' not found in hg38 gene index ({ANNOTATION_VERSION}). "
-                    f"Did you mean: {suggestion_str}?",
-                    code=3,
-                )
-                return
-            gene_name_resolved = gene_info["gene_name"]
-            bam_contig = translate_contig(gene_info["contig"], contig_style)
-            regions.append((
-                bam_contig,
-                gene_info["start"],
-                gene_info["end"],
-                gene_name_resolved,
-            ))
+            # Gene mode — supports comma-separated list (e.g. "BRCA1,TP53")
+            gene_symbols = [g.strip() for g in args.target.split(",") if g.strip()]
+            for symbol in gene_symbols:
+                gene_info = lookup_gene(symbol)
+                if gene_info is None:
+                    suggestions = suggest_genes(symbol)
+                    suggestion_str = ", ".join(suggestions) if suggestions else "(no close matches)"
+                    _error(
+                        f"Gene '{symbol}' not found in hg38 gene index ({ANNOTATION_VERSION}). "
+                        f"Did you mean: {suggestion_str}?",
+                        code=3,
+                    )
+                    return
+                resolved = gene_info["gene_name"]
+                gene_names_resolved.append(resolved)
+                bam_contig = translate_contig(gene_info["contig"], contig_style)
+                regions.append((
+                    bam_contig,
+                    gene_info["start"],
+                    gene_info["end"],
+                    resolved,
+                ))
 
     if not regions:
         _error("No target regions resolved. Nothing to do.", code=1)
@@ -523,9 +527,19 @@ def _run_pipeline(args: argparse.Namespace) -> None:
     exon_metadata_map: Optional[dict[str, list[dict[str, Any]]]] = None
     exon_status_map: Optional[dict[str, list[str]]] = None
 
-    if args.exons and gene_name_resolved:
-        exon_records = lookup_exons(gene_name_resolved)
-        if exon_records:
+    if args.exons and gene_names_resolved:
+        exon_results_map = exon_results_map or {}
+        exon_metadata_map = exon_metadata_map or {}
+        exon_status_map = exon_status_map or {}
+        params = _build_classify_params(args)
+        for gene_name in gene_names_resolved:
+            exon_records = lookup_exons(gene_name)
+            if not exon_records:
+                logger.warning(
+                    "No exon records found for %s. Exon index may not be installed.",
+                    gene_name,
+                )
+                continue
             exon_regions = [
                 (
                     translate_contig(e["contig"], contig_style),
@@ -551,27 +565,19 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                     er.bam_path = args.alignment
                     er.sample_name = sample_name
 
-                exon_results_map = {gene_name_resolved: exon_depth_results}
-                exon_metadata_map = {gene_name_resolved: exon_records}
-
-                # Classify exons
-                params = _build_classify_params(args)
+                exon_results_map[gene_name] = exon_depth_results
+                exon_metadata_map[gene_name] = exon_records
                 exon_statuses = [classify_exon(er, params) for er in exon_depth_results]
-                exon_status_map = {gene_name_resolved: exon_statuses}
+                exon_status_map[gene_name] = exon_statuses
             except RuntimeError as exc:
-                logger.warning("Exon-level analysis failed: %s", exc)
-        else:
-            logger.warning(
-                "No exon records found for %s. Exon index may not be installed.",
-                gene_name_resolved,
-            )
+                logger.warning("Exon-level analysis failed for %s: %s", gene_name, exc)
 
     # ── Region → gene/exon overlay (region mode) ──
     gene_results_list: Optional[list[TargetResult]] = None
     gene_metadata_list: Optional[list[dict[str, Any]]] = None
 
     is_region_mode = (args.target is not None and is_region_string(args.target)
-                      and gene_name_resolved is None)
+                      and not gene_names_resolved)
 
     if is_region_mode and len(regions) == 1:
         reg_contig, reg_start, reg_end, _ = regions[0]

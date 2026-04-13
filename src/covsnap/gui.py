@@ -121,7 +121,7 @@ class CovSnapGUI:
         self.target_label.grid(row=row, column=0, sticky="e", **pad)
         self.target_entry = ttk.Entry(root, textvariable=self.target_var, width=45)
         self.target_entry.grid(row=row, column=1, **pad)
-        self.target_hint = ttk.Label(root, text="e.g. BRCA1, TP53", foreground="gray")
+        self.target_hint = ttk.Label(root, text="e.g. BRCA1 or BRCA1,TP53,ETFDH", foreground="gray")
         self.target_hint.grid(row=8, column=1, sticky="w", padx=8)
 
         # ── BED file ──

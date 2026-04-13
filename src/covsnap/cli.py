@@ -41,10 +41,6 @@ from covsnap.report import (
 
 logger = logging.getLogger("covsnap")
 
-try:
-    from covsnap.interactive import collect_inputs
-except ImportError:  # questionary not installed
-    collect_inputs = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -335,18 +331,11 @@ def _get_engine_version(engine: str) -> str:
 
 
 def _run_interactive() -> None:
-    """Launch interactive mode and run the pipeline with collected inputs."""
-    if collect_inputs is None:
-        print(
-            "[covsnap] ERROR: Interactive mode requires 'questionary'. "
-            "Install it with: pip install questionary",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    """Launch Tkinter GUI and run the pipeline with collected inputs."""
+    from covsnap.gui import run_gui
 
-    args = collect_inputs()
+    args = run_gui()
     if args is None:
-        print("\n[covsnap] Cancelled.", file=sys.stderr)
         sys.exit(0)
 
     if not hasattr(args, "pct_thresholds"):

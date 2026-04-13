@@ -1,12 +1,13 @@
 # covsnap
 
 [![Bioconda](https://img.shields.io/conda/vn/bioconda/covsnap.svg)](https://anaconda.org/bioconda/covsnap)
+[![PyPI](https://img.shields.io/pypi/v/covsnap.svg)](https://pypi.org/project/covsnap/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18732742.svg)](https://doi.org/10.5281/zenodo.18732742)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Coverage inspector for targeted sequencing QC (hg38)**
 
-covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics from BAM/CRAM files aligned to the human reference genome **hg38**. It produces a machine-readable TSV alongside a human-readable Markdown report with automated PASS/FAIL classification heuristics — designed for clinical and research sequencing QC workflows.
+covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics from BAM/CRAM files aligned to the human reference genome **hg38**. It produces a self-contained interactive HTML report with automated PASS/FAIL classification heuristics — designed for clinical and research sequencing QC workflows.
 
 ---
 
@@ -14,14 +15,15 @@ covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics 
 
 - **Gene-aware analysis** — Look up genes by symbol (e.g. `BRCA1`, `TP53`). Ships with a built-in dictionary of ~60 clinically relevant genes and an optional full GENCODE v44 tabix index covering 62,700+ genes.
 - **Exon-level resolution** — Per-exon depth metrics via the `--exons` flag using MANE Select transcripts from GENCODE v44.
-- **Region and BED modes** — Accepts genomic coordinates (`chr17:43044295-43125482`) or a BED file of arbitrary target intervals.
+- **Region and BED modes** — Accepts genomic coordinates (`chr17:43044295-43125482`) or a BED file of arbitrary target intervals. Region mode auto-discovers overlapping genes and exons.
+- **Interactive HTML report** — Single self-contained HTML file with summary cards, exon bar charts with smooth color gradients, accordion details, glossary, and PASS/FAIL classifications.
 - **Streaming architecture** — O(1) memory per target using Welford's online algorithm for mean/variance and histogram-based exact median. No per-base depth arrays are ever held in memory.
+- **Parallel execution** — Concurrent samtools and region/exon analysis for faster results.
 - **Dual engine support** — Prefers [mosdepth](https://github.com/brentp/mosdepth) when available; falls back to `samtools depth`.
 - **Contig auto-detection** — Transparently handles both `chr`-prefixed (UCSC) and non-prefixed (Ensembl/1000G) BAM contig naming.
 - **Gene alias resolution** — Common aliases like `HER2 -> ERBB2` and `P53 -> TP53` are resolved automatically, with fuzzy suggestions for typos.
 - **BED guardrails** — Configurable limits on target count, total bases, and file size to prevent accidental whole-exome/whole-genome runs.
 - **Classification heuristics** — Automated PASS / DROP_OUT / UNEVEN / LOW_EXON / LOW_COVERAGE calls with tunable thresholds.
-- **Multiple output formats** — Raw TSV (25 columns), JSON, exon TSV, low-coverage BED, and interpreted Markdown report.
 
 ---
 
@@ -33,7 +35,13 @@ covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics 
 conda install -c bioconda covsnap
 ```
 
-### From source (pip)
+### From PyPI
+
+```bash
+pip install covsnap
+```
+
+### From source
 
 ```bash
 git clone https://github.com/enes-ak/covsnap.git
@@ -71,13 +79,17 @@ Analyze coverage for a gene by name:
 covsnap sample.bam BRCA1
 ```
 
-This produces two files in the current directory:
-- `covsnap.raw.tsv` — machine-readable metrics
-- `covsnap.report.md` — human-readable interpreted report
+This produces `covsnap.report.html` — an interactive HTML report with coverage metrics and PASS/FAIL classification.
+
+### With exon-level detail
+
+```bash
+covsnap sample.bam BRCA1 --exons
+```
 
 ### Region mode
 
-Specify an explicit genomic region (1-based inclusive coordinates):
+Specify an explicit genomic region (1-based inclusive coordinates). Overlapping genes and exons are auto-discovered:
 
 ```bash
 covsnap sample.bam chr17:43044295-43125482
@@ -91,96 +103,29 @@ Use a BED file of target intervals:
 covsnap sample.bam --bed targets.bed
 ```
 
+### Custom output path
+
+```bash
+covsnap sample.bam BRCA1 -o my_report.html
+```
+
 ### CRAM files
 
 ```bash
 covsnap sample.cram BRCA1 --reference hg38.fa
 ```
 
-### With exon-level detail
-
-```bash
-covsnap sample.bam BRCA1 --exons
-```
-
-This additionally writes `covsnap.exons.tsv` with per-exon metrics for each MANE Select exon.
-
 ---
 
-## Output Files
+## HTML Report
 
-### Raw TSV (`covsnap.raw.tsv`)
+covsnap produces a single self-contained HTML file (no external dependencies) containing:
 
-Tab-separated file with a metadata header line and 25 columns:
-
-| Column | Description |
-|---|---|
-| `target_id` | Gene symbol or BED interval label |
-| `contig` | Chromosome (always hg38 style) |
-| `start` | 0-based start coordinate |
-| `end` | Half-open end coordinate |
-| `length_bp` | Target length in base pairs |
-| `mean_depth` | Mean read depth |
-| `median_depth` | Exact median depth (histogram-based) |
-| `min_depth` | Minimum depth at any position |
-| `max_depth` | Maximum depth at any position |
-| `stdev_depth` | Standard deviation (Welford's algorithm) |
-| `pct_zero` | Percentage of bases with zero coverage |
-| `pct_ge_1` | Percentage of bases with depth >= 1 |
-| `pct_ge_5` | Percentage of bases with depth >= 5 |
-| `pct_ge_10` | Percentage of bases with depth >= 10 |
-| `pct_ge_20` | Percentage of bases with depth >= 20 |
-| `pct_ge_30` | Percentage of bases with depth >= 30 |
-| `pct_ge_50` | Percentage of bases with depth >= 50 |
-| `pct_ge_100` | Percentage of bases with depth >= 100 |
-| `n_lowcov_blocks` | Number of contiguous low-coverage blocks |
-| `lowcov_total_bp` | Total bases in low-coverage blocks |
-| `engine_used` | `samtools` or `mosdepth` |
-| `bam_path` | Path to the input alignment file |
-| `sample_name` | Sample name from BAM `@RG SM` tag |
-| `build` | Always `hg38` |
-| `annotation_version` | Always `gencode_v44` |
-
-The threshold columns (`pct_ge_X`) are customizable with `--pct-thresholds`.
-
-### Exon TSV (`covsnap.exons.tsv`)
-
-Written when `--exons` is used. Contains 12 columns per exon:
-
-| Column | Description |
-|---|---|
-| `target_id` | Parent gene symbol |
-| `exon_id` | GENCODE exon stable ID (e.g. `ENSE00003896691.1`) |
-| `exon_number` | Exon number within the MANE Select transcript |
-| `contig` | Chromosome |
-| `start` | 0-based start |
-| `end` | Half-open end |
-| `length_bp` | Exon length |
-| `mean_depth` | Mean depth across the exon |
-| `median_depth` | Exact median depth |
-| `pct_zero` | Percentage of zero-coverage bases |
-| `pct_ge_20` | Percentage >= 20x |
-| `pct_ge_30` | Percentage >= 30x |
-
-### JSON output (`--json-out`)
-
-Optional structured JSON with all metrics, suitable for programmatic consumption and database loading.
-
-### Low-coverage BED (`--emit-lowcov`)
-
-BED file of contiguous low-coverage blocks. Controlled by:
-- `--lowcov-threshold` (default: 10) — depth below which a position is "low-coverage"
-- `--lowcov-min-len` (default: 50) — minimum block length to report
-
-### Markdown report (`covsnap.report.md`)
-
-Human-readable report including:
-- Run metadata (sample, build, engine, date)
-- Per-target summary table with classification
-- Detailed per-target metrics
-- Exon-level breakdown (when `--exons` is used)
-- Low-coverage block listing
-- Classification heuristics reference
+- **Summary cards** — key metrics at a glance (mean depth, coverage breadth, classification)
+- **Exon bar chart** — per-exon coverage with smooth HSL color gradient (red → amber → teal)
+- **Accordion details** — expandable per-target and per-exon metrics
+- **Low-coverage blocks** — contiguous regions below threshold (when `--emit-lowcov` is used)
+- **Glossary** — definitions of all metrics and classification terms
 
 ---
 
@@ -260,9 +205,8 @@ pip install .
 ```
 covsnap [-h] [--version] [--bed BED] [--exons] [--reference FASTA]
              [--no-index] [--engine {auto,mosdepth,samtools}]
-             [--threads N] [--raw-out FILE] [--report-out FILE]
-             [--json-out FILE] [--exon-out FILE] [--emit-lowcov]
-             [--lowcov-bed FILE] [--lowcov-threshold N] [--lowcov-min-len N]
+             [--threads N] [-o FILE] [--emit-lowcov]
+             [--lowcov-threshold N] [--lowcov-min-len N]
              [--max-targets N] [--max-total-bp N] [--max-bed-bytes BYTES]
              [--on-large-bed {error,warn_and_clip,warn_and_sample}]
              [--large-bed-seed N] [--pct-thresholds LIST]
@@ -288,10 +232,9 @@ covsnap [-h] [--version] [--bed BED] [--exons] [--reference FASTA]
 | `--exons` | Enable exon-level statistics (gene mode only) | off |
 | `--reference FASTA` | Reference FASTA for CRAM decoding | — |
 | `--engine` | Depth engine: `auto`, `mosdepth`, `samtools` | `auto` |
-| `--threads N` | Threads for mosdepth | 4 |
-| `--raw-out FILE` | Raw TSV output path | `covsnap.raw.tsv` |
-| `--report-out FILE` | Report markdown path | `covsnap.report.md` |
-| `--json-out FILE` | JSON output path | — |
+| `--threads N` | Parallel workers for samtools / threads for mosdepth | 4 |
+| `-o FILE` / `--output FILE` | HTML report output path | `covsnap.report.html` |
+| `--emit-lowcov` | Include low-coverage blocks in the report | off |
 | `-v` / `--verbose` | Increase verbosity (repeatable) | — |
 | `--quiet` | Suppress non-error output | off |
 
@@ -313,32 +256,22 @@ User-facing region input accepts **1-based inclusive** coordinates (e.g. `chr17:
 
 ## Examples
 
-### Basic gene analysis with custom output paths
+### Gene mode with custom output
 
 ```bash
-covsnap sample.bam BRCA1 \
-    --raw-out results/brca1.tsv \
-    --report-out results/brca1.report.md
+covsnap sample.bam BRCA1 -o results/brca1.html
 ```
 
 ### Multi-gene panel via BED
 
 ```bash
-covsnap sample.bam --bed panel_targets.bed \
-    --raw-out panel_results.tsv \
-    --report-out panel_report.md \
-    --json-out panel_results.json
+covsnap sample.bam --bed panel_targets.bed -o panel_report.html
 ```
 
 ### Exon-level analysis with low-coverage output
 
 ```bash
-covsnap sample.bam BRCA1 \
-    --exons \
-    --exon-out brca1_exons.tsv \
-    --emit-lowcov \
-    --lowcov-bed brca1_lowcov.bed \
-    --lowcov-threshold 20
+covsnap sample.bam BRCA1 --exons --emit-lowcov --lowcov-threshold 20
 ```
 
 ### Strict BED guardrails
@@ -350,10 +283,10 @@ covsnap sample.bam --bed wes_targets.bed \
     --max-total-bp 10000000
 ```
 
-### Using samtools explicitly
+### Using samtools explicitly with more threads
 
 ```bash
-covsnap sample.bam TP53 --engine samtools
+covsnap sample.bam TP53 --engine samtools --threads 8
 ```
 
 ---
@@ -392,13 +325,12 @@ covsnap/
 │   ├── bed.py               # Streaming BED parser with guardrails
 │   ├── metrics.py           # TargetAccumulator (Welford + histogram)
 │   ├── engines.py           # samtools / mosdepth depth computation
-│   ├── output.py            # TSV, JSON, BED writers
-│   ├── report.py            # Classification heuristics + Markdown report
+│   ├── html_report.py       # Self-contained interactive HTML report
+│   ├── report.py            # Classification heuristics
 │   └── data/                # Gene/exon tabix indexes (GENCODE v44)
-├── tests/                   # Comprehensive test suite (~90 tests)
+├── tests/                   # Comprehensive test suite
 ├── scripts/
 │   └── build_gene_index.py  # GENCODE GTF → tabix index builder
-├── examples/                # Sample output files
 ├── recipes/conda/           # Bioconda-compatible recipe
 └── pyproject.toml
 ```

@@ -332,13 +332,14 @@ def _get_engine_version(engine: str) -> str:
 
 
 def _run_interactive() -> None:
-    """Launch Tkinter GUI and run the pipeline with collected inputs."""
+    """Launch Tkinter GUI which handles the full pipeline internally."""
     from covsnap.gui import run_gui
 
-    args = run_gui()
-    if args is None:
-        sys.exit(0)
+    run_gui(pipeline_fn=_run_gui_pipeline)
 
+
+def _run_gui_pipeline(args: argparse.Namespace) -> str:
+    """Run the pipeline from GUI context. Returns output path on success, raises on error."""
     if not hasattr(args, "pct_thresholds"):
         args.pct_thresholds = "1,5,10,20,30,50,100"
 
@@ -346,10 +347,12 @@ def _run_interactive() -> None:
         level=logging.WARNING,
         format="[covsnap] %(levelname)s: %(message)s",
         stream=sys.stderr,
+        force=True,
     )
 
     _validate_args(args)
     _run_pipeline(args)
+    return args.output
 
 
 # ---------------------------------------------------------------------------

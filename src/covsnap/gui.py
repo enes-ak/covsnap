@@ -9,9 +9,11 @@ or *None* if the user closes the window.
 from __future__ import annotations
 
 import argparse
+import os
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-from typing import Optional
+from typing import Callable, Optional
 
 from covsnap import __version__
 
@@ -47,8 +49,9 @@ _DEFAULTS = dict(
 class CovSnapGUI:
     """Main application window."""
 
-    def __init__(self) -> None:
+    def __init__(self, pipeline_fn: Optional[Callable] = None) -> None:
         self.result: Optional[argparse.Namespace] = None
+        self.pipeline_fn = pipeline_fn
 
         self.root = tk.Tk()
         self.root.title(f"covsnap v{__version__}")
@@ -169,11 +172,18 @@ class CovSnapGUI:
 
         self._build_advanced(self.advanced_frame)
 
+        # ── Status label ──
+        self.status_var = tk.StringVar(master=root)
+        self.status_label = ttk.Label(root, textvariable=self.status_var, foreground="gray")
+        self.status_label.grid(row=17, column=0, columnspan=3, pady=(4, 0))
+
         # ── Run / Cancel ──
         btn_frame = ttk.Frame(root)
-        btn_frame.grid(row=17, column=0, columnspan=3, pady=(8, 12))
-        ttk.Button(btn_frame, text="Run Analysis", command=self._on_run).pack(side="left", padx=8)
-        ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side="left", padx=8)
+        btn_frame.grid(row=18, column=0, columnspan=3, pady=(4, 12))
+        self.run_button = ttk.Button(btn_frame, text="Run Analysis", command=self._on_run)
+        self.run_button.pack(side="left", padx=8)
+        self.cancel_button = ttk.Button(btn_frame, text="Cancel", command=self._on_cancel)
+        self.cancel_button.pack(side="left", padx=8)
 
     def _build_advanced(self, frame: ttk.LabelFrame) -> None:
         pad = dict(padx=6, pady=2)
@@ -354,7 +364,46 @@ class CovSnapGUI:
         )
 
         self.result = argparse.Namespace(**settings)
-        self.root.destroy()
+
+        if self.pipeline_fn is None:
+            # No pipeline provided (e.g. testing) — just close
+            self.root.destroy()
+            return
+
+        # Disable controls and show status
+        self.run_button.config(state="disabled")
+        self.status_var.set("Analyzing... please wait.")
+        self.status_label.config(foreground="#0D9488")
+        self.root.update_idletasks()
+
+        # Run pipeline in background thread
+        thread = threading.Thread(target=self._run_pipeline_thread, daemon=True)
+        thread.start()
+
+    def _run_pipeline_thread(self) -> None:
+        """Run pipeline in a background thread; schedule UI update when done."""
+        try:
+            output_path = self.pipeline_fn(self.result)
+            self.root.after(0, self._on_pipeline_done, output_path, None)
+        except SystemExit:
+            # _validate_args calls sys.exit on error
+            self.root.after(0, self._on_pipeline_done, None, "Validation failed. Check your inputs.")
+        except Exception as exc:
+            self.root.after(0, self._on_pipeline_done, None, str(exc))
+
+    def _on_pipeline_done(self, output_path: Optional[str], error: Optional[str]) -> None:
+        """Handle pipeline completion on the main thread."""
+        if error:
+            self.status_var.set("")
+            self.run_button.config(state="normal")
+            messagebox.showerror("Error", f"Analysis failed:\n{error}")
+            return
+
+        abs_path = os.path.abspath(output_path)
+        self.status_var.set(f"Done! Report: {abs_path}")
+        self.status_label.config(foreground="#0D9488")
+        self.run_button.config(state="normal")
+        messagebox.showinfo("Analysis Complete", f"Report saved to:\n{abs_path}")
 
     def _on_cancel(self) -> None:
         self.result = None
@@ -368,7 +417,11 @@ class CovSnapGUI:
         return self.result
 
 
-def run_gui() -> Optional[argparse.Namespace]:
-    """Entry point: create and run the GUI, return collected args or None."""
-    app = CovSnapGUI()
+def run_gui(pipeline_fn: Optional[Callable] = None) -> Optional[argparse.Namespace]:
+    """Entry point: create and run the GUI.
+
+    If *pipeline_fn* is provided, the pipeline runs inside the GUI window
+    (with status feedback). Otherwise the GUI just collects inputs and returns.
+    """
+    app = CovSnapGUI(pipeline_fn=pipeline_fn)
     return app.run()

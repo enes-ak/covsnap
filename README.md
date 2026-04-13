@@ -13,7 +13,8 @@ covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics 
 
 ## Key Features
 
-- **Gene-aware analysis** — Look up genes by symbol (e.g. `BRCA1`, `TP53`). Ships with a built-in dictionary of ~60 clinically relevant genes and an optional full GENCODE v44 tabix index covering 62,700+ genes.
+- **Graphical interface** — Run `covsnap` with no arguments to launch a Tkinter GUI with file pickers, mode selection, and progress feedback. Works on Linux, macOS, and Windows.
+- **Gene-aware analysis** — Look up genes by symbol (e.g. `BRCA1`) or analyze multiple genes at once with a comma-separated list (e.g. `BRCA1,TP53,ETFDH`). Ships with a built-in dictionary of ~60 clinically relevant genes and an optional full GENCODE v44 tabix index covering 62,700+ genes.
 - **Exon-level resolution** — Per-exon depth metrics via the `--exons` flag using MANE Select transcripts from GENCODE v44.
 - **Region and BED modes** — Accepts genomic coordinates (`chr17:43044295-43125482`) or a BED file of arbitrary target intervals. Region mode auto-discovers overlapping genes and exons.
 - **Interactive HTML report** — Single self-contained HTML file with summary cards, exon bar charts with smooth color gradients, accordion details, glossary, and PASS/FAIL classifications.
@@ -71,6 +72,16 @@ pip install ".[dev]"
 
 ## Quick Start
 
+### Graphical interface
+
+Run covsnap with no arguments to launch the GUI:
+
+```bash
+covsnap
+```
+
+A window opens where you can select your BAM file, choose analysis mode, configure options, and run the analysis — all without typing commands.
+
 ### Gene mode
 
 Analyze coverage for a gene by name:
@@ -80,6 +91,14 @@ covsnap sample.bam BRCA1
 ```
 
 This produces `covsnap.report.html` — an interactive HTML report with coverage metrics and PASS/FAIL classification.
+
+### Multiple genes
+
+Analyze several genes in a single run with a comma-separated list:
+
+```bash
+covsnap sample.bam BRCA1,TP53,ETFDH --exons
+```
 
 ### With exon-level detail
 
@@ -222,7 +241,7 @@ covsnap [-h] [--version] [--bed BED] [--exons] [--reference FASTA]
 | Argument | Description |
 |---|---|
 | `alignment` | Path to BAM or CRAM file |
-| `target` | Gene symbol or genomic region. Mutually exclusive with `--bed` |
+| `target` | Gene symbol, comma-separated gene list, or genomic region. Mutually exclusive with `--bed` |
 
 ### Commonly used options
 
@@ -260,6 +279,12 @@ User-facing region input accepts **1-based inclusive** coordinates (e.g. `chr17:
 
 ```bash
 covsnap sample.bam BRCA1 -o results/brca1.html
+```
+
+### Multiple genes with exon breakdown
+
+```bash
+covsnap sample.bam BRCA1,TP53,ETFDH --exons -o panel_report.html
 ```
 
 ### Multi-gene panel via BED
@@ -325,6 +350,7 @@ covsnap/
 │   ├── bed.py               # Streaming BED parser with guardrails
 │   ├── metrics.py           # TargetAccumulator (Welford + histogram)
 │   ├── engines.py           # samtools / mosdepth depth computation
+│   ├── gui.py               # Tkinter graphical interface
 │   ├── html_report.py       # Self-contained interactive HTML report
 │   ├── report.py            # Classification heuristics
 │   └── data/                # Gene/exon tabix indexes (GENCODE v44)

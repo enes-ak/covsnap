@@ -59,8 +59,9 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
+            "  covsnap                                                # launch graphical interface\n"
             "  covsnap sample.bam BRCA1                              # gene mode\n"
-            "  covsnap sample.bam BRCA1 --exons                      # gene + exon breakdown\n"
+            "  covsnap sample.bam BRCA1,TP53,ETFDH --exons           # multiple genes + exons\n"
             "  covsnap sample.bam chr17:43044295-43125482             # region mode (auto-finds genes & exons)\n"
             "  covsnap sample.bam --bed targets.bed                   # BED mode\n"
             "  covsnap sample.bam BRCA1 -o my_report.html             # custom output path\n"

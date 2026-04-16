@@ -11,6 +11,7 @@
 <p align="center">
   <a href="https://anaconda.org/bioconda/covsnap"><img src="https://img.shields.io/conda/vn/bioconda/covsnap.svg" alt="Bioconda"></a>
   <a href="https://pypi.org/project/covsnap/"><img src="https://img.shields.io/pypi/v/covsnap.svg" alt="PyPI"></a>
+  <a href="https://quay.io/repository/biocontainers/covsnap"><img src="https://img.shields.io/badge/BioContainers-quay.io-blue" alt="BioContainers"></a>
   <a href="https://doi.org/10.5281/zenodo.18732742"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.18732742.svg" alt="DOI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
@@ -68,6 +69,14 @@ conda install -c bioconda covsnap
 
 ```bash
 pip install covsnap
+```
+
+### Docker (BioContainers)
+
+```bash
+docker pull quay.io/biocontainers/covsnap:0.3.0--pyhdfd78af_0
+docker run --rm -v $(pwd):/data quay.io/biocontainers/covsnap:0.3.0--pyhdfd78af_0 \
+    covsnap /data/sample.bam BRCA1 -o /data/report.html
 ```
 
 ### From source

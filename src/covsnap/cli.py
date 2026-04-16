@@ -31,7 +31,7 @@ from covsnap.annotation import (
 from covsnap.bed import enforce_limits
 from covsnap.engines import compute_depth, ensure_index, select_engine
 from covsnap.html_report import write_html_report
-from covsnap.metrics import TargetResult
+from covsnap.metrics import TargetResult, merge_exon_results
 from covsnap.report import (
     ClassifyParams,
     ReportContext,
@@ -101,6 +101,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--exons",
         action="store_true",
         help="Enable exon-level statistics (gene mode only).",
+    )
+    inp.add_argument(
+        "--exon-only",
+        action="store_true",
+        help=(
+            "Compute gene-level metrics from exonic regions only, excluding introns. "
+            "Useful for targeted/exome panels where intronic regions have no coverage "
+            "by design. Combine with --exons to also show per-exon details in the report."
+        ),
     )
     inp.add_argument(
         "--reference",
@@ -291,6 +300,9 @@ def _validate_args(args: argparse.Namespace) -> None:
     # Exons mode requires gene target (not region or bed)
     if args.exons and args.bed is not None:
         _error("--exons is only supported in gene mode (positional gene target), not with --bed.", code=1)
+
+    if args.exon_only and args.bed is not None:
+        _error("--exon-only is only supported in gene mode, not with --bed.", code=1)
 
 
 def _error(message: str, code: int = 1) -> None:
@@ -531,7 +543,8 @@ def _run_pipeline(args: argparse.Namespace) -> None:
     exon_metadata_map: Optional[dict[str, list[dict[str, Any]]]] = None
     exon_status_map: Optional[dict[str, list[str]]] = None
 
-    if args.exons and gene_names_resolved:
+    need_exon_depth = (args.exons or args.exon_only) and gene_names_resolved
+    if need_exon_depth:
         exon_results_map = exon_results_map or {}
         exon_metadata_map = exon_metadata_map or {}
         exon_status_map = exon_status_map or {}
@@ -575,6 +588,22 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                 exon_status_map[gene_name] = exon_statuses
             except RuntimeError as exc:
                 logger.warning("Exon-level analysis failed for %s: %s", gene_name, exc)
+
+        # ── Exon-only: replace gene-level results with exon-aggregated ones ──
+        if args.exon_only and exon_results_map:
+            for i, (contig, start, end, name) in enumerate(regions):
+                if name in exon_results_map:
+                    merged = merge_exon_results(
+                        exon_results_map[name], name, contig, start, end,
+                    )
+                    merged.engine_used = engine
+                    merged.bam_path = args.alignment
+                    merged.sample_name = sample_name
+                    results[i] = merged
+                    logger.info(
+                        "%s: exon-only metrics — %d exonic bp (was %d gene bp)",
+                        name, merged.length_bp, end - start,
+                    )
 
     # ── Region → gene/exon overlay (region mode) ──
     gene_results_list: Optional[list[TargetResult]] = None
@@ -710,13 +739,14 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         reference=args.reference,
         bed_path=args.bed,
         bed_guardrail_message=bed_guardrail_message,
-        exon_results=exon_results_map if exon_results_map else None,
-        exon_metadata=exon_metadata_map if exon_metadata_map else None,
-        exon_statuses=exon_status_map if exon_status_map else None,
+        exon_results=exon_results_map if (exon_results_map and args.exons) else None,
+        exon_metadata=exon_metadata_map if (exon_metadata_map and args.exons) else None,
+        exon_statuses=exon_status_map if (exon_status_map and args.exons) else None,
         classify_params=params,
         lowcov_threshold=args.lowcov_threshold,
         lowcov_min_len=args.lowcov_min_len,
         emit_lowcov=args.emit_lowcov,
+        exon_only=getattr(args, 'exon_only', False),
         thresholds=thresholds,
         run_date=run_date,
         gene_results=gene_results_list,

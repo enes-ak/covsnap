@@ -133,6 +133,7 @@ class ReportContext:
     lowcov_threshold: int = 10
     lowcov_min_len: int = 50
     emit_lowcov: bool = False
+    exon_only: bool = False
     lowcov_bed_path: str = ""
     thresholds: list[int] = field(default_factory=lambda: [1, 5, 10, 20, 30, 50, 100])
     run_date: Optional[str] = None

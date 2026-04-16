@@ -21,6 +21,7 @@ from covsnap import __version__
 _DEFAULTS = dict(
     bed=None,
     exons=False,
+    exon_only=False,
     reference=None,
     no_index=False,
     engine="auto",
@@ -57,6 +58,9 @@ class CovSnapGUI:
         self.root.title(f"covsnap v{__version__}")
         self.root.resizable(False, False)
 
+        # ── Window icon ──
+        self._set_icon()
+
         # ── Variables ──
         r = self.root
         self.alignment_var = tk.StringVar(master=r)
@@ -65,6 +69,7 @@ class CovSnapGUI:
         self.bed_var = tk.StringVar(master=r)
         self.reference_var = tk.StringVar(master=r)
         self.exons_var = tk.BooleanVar(master=r, value=False)
+        self.exon_only_var = tk.BooleanVar(master=r, value=False)
         self.engine_var = tk.StringVar(master=r, value="auto")
         self.output_var = tk.StringVar(master=r, value="covsnap.report.html")
         # Advanced
@@ -79,6 +84,21 @@ class CovSnapGUI:
 
         self._build_ui()
         self._on_mode_change()
+
+    # ── Icon ──────────────────────────────────────────────────────────
+
+    def _set_icon(self) -> None:
+        """Set window icon from the bundled logo."""
+        try:
+            logo_path = os.path.join(
+                os.path.dirname(__file__), "data", "covsnap_logo.png",
+            )
+            if os.path.exists(logo_path):
+                icon = tk.PhotoImage(file=logo_path)
+                self.root.iconphoto(True, icon)
+                self._icon_ref = icon  # prevent garbage collection
+        except Exception:
+            pass  # icon is cosmetic, never fail on it
 
     # ── UI Construction ────────────────────────────────────────────────
 
@@ -136,17 +156,24 @@ class CovSnapGUI:
         self.bed_button = ttk.Button(root, text="Browse...", command=self._browse_bed)
         self.bed_button.grid(row=row, column=2, **pad)
 
-        # ── Exons checkbox ──
+        # ── Exons checkboxes ──
         row = 10
-        self.exons_check = ttk.Checkbutton(root, text="Include exon-level detail",
+        self.exons_check = ttk.Checkbutton(root, text="Show exon-level detail",
                                             variable=self.exons_var)
         self.exons_check.grid(row=row, column=1, sticky="w", **pad)
 
+        row = 11
+        self.exon_only_check = ttk.Checkbutton(
+            root, text="Exon-only metrics (exclude introns)",
+            variable=self.exon_only_var,
+        )
+        self.exon_only_check.grid(row=row, column=1, sticky="w", **pad)
+
         # ── Separator ──
-        ttk.Separator(root, orient="horizontal").grid(row=11, column=0, columnspan=3, sticky="ew", pady=8)
+        ttk.Separator(root, orient="horizontal").grid(row=12, column=0, columnspan=3, sticky="ew", pady=8)
 
         # ── Engine ──
-        row = 12
+        row = 13
         ttk.Label(root, text="Engine:").grid(row=row, column=0, sticky="e", **pad)
         engine_combo = ttk.Combobox(root, textvariable=self.engine_var,
                                      values=["auto", "samtools", "mosdepth"],
@@ -154,18 +181,18 @@ class CovSnapGUI:
         engine_combo.grid(row=row, column=1, sticky="w", **pad)
 
         # ── Output ──
-        row = 13
+        row = 14
         ttk.Label(root, text="Output file:").grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(root, textvariable=self.output_var, width=45).grid(row=row, column=1, **pad)
         ttk.Button(root, text="Browse...", command=self._browse_output).grid(row=row, column=2, **pad)
 
         # ── Advanced settings (collapsible) ──
-        ttk.Separator(root, orient="horizontal").grid(row=14, column=0, columnspan=3, sticky="ew", pady=8)
+        ttk.Separator(root, orient="horizontal").grid(row=15, column=0, columnspan=3, sticky="ew", pady=8)
 
         self.advanced_open = tk.BooleanVar(master=root, value=False)
         self.advanced_toggle = ttk.Button(root, text="Advanced Settings (optional) \u25b6",
                                            command=self._toggle_advanced)
-        self.advanced_toggle.grid(row=15, column=0, columnspan=3, pady=(0, 4))
+        self.advanced_toggle.grid(row=16, column=0, columnspan=3, pady=(0, 4))
 
         self.advanced_frame = ttk.LabelFrame(root, text="Advanced Settings", padding=8)
         # Not gridded initially — shown/hidden by _toggle_advanced
@@ -175,11 +202,11 @@ class CovSnapGUI:
         # ── Status label ──
         self.status_var = tk.StringVar(master=root)
         self.status_label = ttk.Label(root, textvariable=self.status_var, foreground="gray")
-        self.status_label.grid(row=17, column=0, columnspan=3, pady=(4, 0))
+        self.status_label.grid(row=19, column=0, columnspan=3, pady=(4, 0))
 
         # ── Run / Cancel ──
         btn_frame = ttk.Frame(root)
-        btn_frame.grid(row=18, column=0, columnspan=3, pady=(4, 12))
+        btn_frame.grid(row=20, column=0, columnspan=3, pady=(4, 12))
         self.run_button = ttk.Button(btn_frame, text="Run Analysis", command=self._on_run)
         self.run_button.pack(side="left", padx=8)
         self.cancel_button = ttk.Button(btn_frame, text="Cancel", command=self._on_cancel)
@@ -228,18 +255,23 @@ class CovSnapGUI:
             self._show_target(True)
             self._show_bed(False)
             self.exons_check.grid()
+            self.exon_only_check.grid()
         elif mode == "region":
             self.target_label.config(text="Genomic region:")
             self.target_hint.config(text="e.g. chr17:43044295-43125482")
             self._show_target(True)
             self._show_bed(False)
             self.exons_check.grid_remove()
+            self.exon_only_check.grid_remove()
             self.exons_var.set(False)
+            self.exon_only_var.set(False)
         else:  # bed
             self._show_target(False)
             self._show_bed(True)
             self.exons_check.grid_remove()
+            self.exon_only_check.grid_remove()
             self.exons_var.set(False)
+            self.exon_only_var.set(False)
 
     def _show_target(self, show: bool) -> None:
         if show:
@@ -350,6 +382,7 @@ class CovSnapGUI:
             target=target,
             bed=bed,
             exons=self.exons_var.get(),
+            exon_only=self.exon_only_var.get(),
             reference=reference,
             engine=self.engine_var.get(),
             output=self.output_var.get().strip() or "covsnap.report.html",

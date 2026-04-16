@@ -50,6 +50,7 @@ class TargetResult:
     n_lowcov_blocks: int
     lowcov_total_bp: int
     lowcov_blocks: list[LowCovBlock]
+    histogram: dict[int, int] = field(default_factory=dict)  # depth → count
     engine_used: str = ""
     bam_path: str = ""
     sample_name: str = "NA"
@@ -277,6 +278,7 @@ class TargetAccumulator:
             n_lowcov_blocks=len(self._lowcov_blocks),
             lowcov_total_bp=lowcov_total_bp,
             lowcov_blocks=self._lowcov_blocks,
+            histogram=dict(self._histogram),
         )
 
     def _compute_median(self) -> float:
@@ -307,13 +309,131 @@ class TargetAccumulator:
         return 0.0
 
 
-def merge_accumulator_results(
-    results: list[TargetResult],
-    extra_fields: dict[str, Any],
-) -> list[TargetResult]:
-    """Attach shared metadata fields (engine_used, bam_path, etc.) to results."""
-    for r in results:
-        for k, v in extra_fields.items():
-            if hasattr(r, k):
-                setattr(r, k, v)
-    return results
+def merge_exon_results(
+    exon_results: list[TargetResult],
+    gene_name: str,
+    contig: str,
+    gene_start: int,
+    gene_end: int,
+) -> TargetResult:
+    """Merge multiple exon-level TargetResults into a single gene-level result.
+
+    Combines histograms for exact median, uses parallel variance formula
+    for stdev, and aggregates all threshold/zero counts.
+    """
+    if not exon_results:
+        raise ValueError("Cannot merge empty exon results list")
+
+    # Merge histograms
+    merged_hist: dict[int, int] = defaultdict(int)
+    total_bases = 0
+    total_sum = 0
+    min_depth = 2**31
+    max_depth = 0
+    zero_count = 0
+    threshold_counts: dict[int, int] = {}
+    all_lowcov: list[LowCovBlock] = []
+
+    # Parallel variance: combine (n, mean, M2) from each exon
+    combined_n = 0
+    combined_mean = 0.0
+    combined_m2 = 0.0
+
+    for er in exon_results:
+        n_i = er.length_bp
+        if n_i == 0:
+            continue
+
+        # Histogram
+        for depth, count in er.histogram.items():
+            merged_hist[depth] += count
+
+        total_bases += n_i
+        total_sum += round(er.mean_depth * n_i)
+
+        if er.min_depth < min_depth:
+            min_depth = er.min_depth
+        if er.max_depth > max_depth:
+            max_depth = er.max_depth
+
+        # Zero count from pct
+        zero_count += round(er.pct_zero / 100 * n_i)
+
+        # Threshold counts from pct
+        for t, pct in er.pct_thresholds.items():
+            threshold_counts[t] = threshold_counts.get(t, 0) + round(pct / 100 * n_i)
+
+        # Low-cov blocks
+        all_lowcov.extend(er.lowcov_blocks)
+
+        # Parallel variance (Chan's method)
+        if combined_n == 0:
+            combined_n = n_i
+            combined_mean = er.mean_depth
+            combined_m2 = er.stdev_depth ** 2 * n_i
+        else:
+            delta = er.mean_depth - combined_mean
+            new_n = combined_n + n_i
+            combined_mean = (combined_n * combined_mean + n_i * er.mean_depth) / new_n
+            combined_m2 += er.stdev_depth ** 2 * n_i + delta ** 2 * combined_n * n_i / new_n
+            combined_n = new_n
+
+    # Compute final metrics
+    mean_depth = total_sum / total_bases if total_bases > 0 else 0.0
+    variance = combined_m2 / combined_n if combined_n > 1 else 0.0
+    stdev = math.sqrt(variance) if variance > 0 else 0.0
+    pct_zero = (zero_count / total_bases * 100) if total_bases > 0 else 0.0
+
+    pct_thresholds = {}
+    for t, cnt in threshold_counts.items():
+        pct_thresholds[t] = round(cnt / total_bases * 100, 2) if total_bases > 0 else 0.0
+
+    # Median from merged histogram
+    median_depth = _median_from_histogram(merged_hist)
+
+    all_lowcov.sort(key=lambda b: (b.start, b.end))
+    lowcov_total_bp = sum(b.length for b in all_lowcov)
+
+    return TargetResult(
+        target_id=gene_name,
+        contig=contig,
+        start=gene_start,
+        end=gene_end,
+        length_bp=total_bases,
+        mean_depth=round(mean_depth, 2),
+        median_depth=round(median_depth, 1),
+        min_depth=min_depth if min_depth != 2**31 else 0,
+        max_depth=max_depth,
+        stdev_depth=round(stdev, 2),
+        pct_zero=round(pct_zero, 2),
+        pct_thresholds=pct_thresholds,
+        n_lowcov_blocks=len(all_lowcov),
+        lowcov_total_bp=lowcov_total_bp,
+        lowcov_blocks=all_lowcov,
+        histogram=dict(merged_hist),
+    )
+
+
+def _median_from_histogram(histogram: dict[int, int]) -> float:
+    """Compute median from a depth histogram."""
+    if not histogram:
+        return 0.0
+    total = sum(histogram.values())
+    if total == 0:
+        return 0.0
+
+    mid = total / 2.0
+    cumulative = 0
+    prev_depth = 0
+
+    for depth in sorted(histogram.keys()):
+        cumulative += histogram[depth]
+        if cumulative >= mid:
+            if total % 2 == 1:
+                return float(depth)
+            if cumulative - histogram[depth] < mid:
+                return float(depth)
+            return (prev_depth + depth) / 2.0
+        prev_depth = depth
+
+    return 0.0

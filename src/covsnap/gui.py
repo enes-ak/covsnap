@@ -418,9 +418,14 @@ class CovSnapGUI:
         try:
             output_path = self.pipeline_fn(self.result)
             self.root.after(0, self._on_pipeline_done, output_path, None)
-        except SystemExit:
-            # _validate_args calls sys.exit on error
-            self.root.after(0, self._on_pipeline_done, None, "Validation failed. Check your inputs.")
+        except SystemExit as exc:
+            # _error() prints to stderr then calls sys.exit — capture the
+            # last stderr line so the GUI can show the real message.
+            import io, contextlib
+            msg = getattr(exc, '_covsnap_message', None)
+            if msg is None:
+                msg = f"Process exited with code {exc.code}. Check terminal for details."
+            self.root.after(0, self._on_pipeline_done, None, msg)
         except Exception as exc:
             self.root.after(0, self._on_pipeline_done, None, str(exc))
 

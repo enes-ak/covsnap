@@ -308,7 +308,9 @@ def _validate_args(args: argparse.Namespace) -> None:
 def _error(message: str, code: int = 1) -> None:
     """Print an error to stderr and exit."""
     print(f"[covsnap] ERROR: {message}", file=sys.stderr)
-    sys.exit(code)
+    exc = SystemExit(code)
+    exc._covsnap_message = message  # type: ignore[attr-defined]
+    raise exc
 
 
 # ---------------------------------------------------------------------------

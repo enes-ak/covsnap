@@ -24,6 +24,12 @@
 
 ---
 
+## Demo
+
+<p align="center">
+  <video src="https://github.com/enes-ak/covsnap/releases/download/v0.3.0/covsnap-demo.mp4" width="800" controls></video>
+</p>
+
 ## Screenshots
 
 ### Interactive HTML Report

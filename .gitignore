@@ -10,6 +10,8 @@ build/
 *.cram
 *.crai
 .ruff_cache/
+.codex/
+.superpowers/
 covsnap.raw.tsv
 covsnap.report.md
 covsnap.report.html

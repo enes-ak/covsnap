@@ -11,6 +11,24 @@ covsnap computes per-target (and optionally per-exon) depth-of-coverage metrics 
 
 ---
 
+## Screenshots
+
+### Interactive HTML Report
+
+<p align="center">
+  <img src="docs/screenshots/html-report-full.png" alt="covsnap HTML report showing summary cards, exon coverage chart, and PASS/FAIL classification" width="800">
+</p>
+
+### Graphical Interface (GUI)
+
+<p align="center">
+  <img src="docs/screenshots/gui.png" alt="covsnap Tkinter GUI with file pickers, mode selection, and analysis options" width="500">
+</p>
+
+Run `covsnap` with no arguments to launch the GUI.
+
+---
+
 ## Key Features
 
 - **Graphical interface** — Run `covsnap` with no arguments to launch a Tkinter GUI with file pickers, mode selection, and progress feedback. Works on Linux, macOS, and Windows.

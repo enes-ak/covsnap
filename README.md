@@ -343,6 +343,7 @@ covsnap sample.bam TP53 --engine samtools --threads 8
 | 2 | Engine error (samtools/mosdepth failure) |
 | 3 | Unknown gene name (with fuzzy suggestions printed to stderr) |
 | 4 | BED guardrail limits exceeded (when `--on-large-bed error`) |
+| 5 | CRAM reference not provided (missing `--reference` and no `REF_PATH`/`REF_CACHE`) |
 
 ---
 

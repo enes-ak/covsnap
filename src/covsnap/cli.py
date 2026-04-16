@@ -107,8 +107,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Compute gene-level metrics from exonic regions only, excluding introns. "
-            "Implies --exons. Useful for targeted/exome panels where intronic regions "
-            "have no coverage by design."
+            "Useful for targeted/exome panels where intronic regions have no coverage "
+            "by design. Combine with --exons to also show per-exon details in the report."
         ),
     )
     inp.add_argument(

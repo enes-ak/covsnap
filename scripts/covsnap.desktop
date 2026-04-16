@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=covsnap
+Comment=Coverage inspector for targeted sequencing QC (hg38)
+Exec=covsnap
+Icon=covsnap
+Type=Application
+Categories=Science;Biology;
+Terminal=false

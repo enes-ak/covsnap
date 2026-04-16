@@ -57,6 +57,7 @@ covsnap = [
     "data/*.bed.gz",
     "data/*.bed.gz.tbi",
     "data/*.json.gz",
+    "data/*.png",
 ]
 
 [tool.pytest.ini_options]

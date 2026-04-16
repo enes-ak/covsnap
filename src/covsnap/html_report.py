@@ -7,8 +7,10 @@ from any location on disk.
 
 from __future__ import annotations
 
+import base64
 import html
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -37,6 +39,18 @@ def write_html_report(path: str, ctx: ReportContext) -> None:
 # ---------------------------------------------------------------------------
 
 _E = html.escape  # shorthand
+
+
+def _load_logo_b64() -> str:
+    """Load the bundled logo as a base64 data URI, or return empty string."""
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), "data", "covsnap_logo.png")
+        if os.path.exists(logo_path):
+            with open(logo_path, "rb") as f:
+                return "data:image/png;base64," + base64.b64encode(f.read()).decode()
+    except Exception:
+        pass
+    return ""
 
 
 def _format_date(raw: str) -> str:
@@ -141,23 +155,35 @@ def _build_html(ctx: ReportContext) -> str:
     w("<body>")
 
     # -- Header --
+    logo_b64 = _load_logo_b64()
     w('<header class="header">')
-    w('<div class="container">')
-    w('<h1>covsnap Coverage Report</h1>')
-    w('<div class="meta-grid">')
-    _meta_item(w, "Tool version", f"covsnap {__version__}")
-    _meta_item(w, "Date", _E(_format_date(ctx.run_date or "")))
-    _meta_item(w, "Engine", f"{_E(ctx.engine_used)} {_E(ctx.engine_version)}")
-    _meta_item(w, "Annotation", f"GENCODE v44 ({BUILD})")
-    _meta_item(w, "Input", f"<code>{_E(ctx.bam_path)}</code>")
-    _meta_item(w, "Sample", _E(ctx.sample_name))
-    _meta_item(w, "Contig style", f"{_E(ctx.contig_style)}-prefixed (auto-detected)")
+    w('<div class="header-inner">')
+    w('<div class="header-brand">')
+    if logo_b64:
+        w(f'<img src="{logo_b64}" alt="covsnap" class="header-logo">')
+    w('<div class="header-brand-text">')
+    w('<h1>covsnap</h1>')
+    w('<p class="header-subtitle">Coverage Report</p>')
+    w('</div></div>')
+    # Meta chips on the right
+    w('<div class="header-meta">')
+    w(f'<span class="meta-chip"><b>Sample</b> {_E(ctx.sample_name)}</span>')
+    w(f'<span class="meta-chip"><b>Engine</b> {_E(ctx.engine_used)} {_E(ctx.engine_version)}</span>')
+    w(f'<span class="meta-chip"><b>Date</b> {_E(_format_date(ctx.run_date or ""))}</span>')
+    w(f'<span class="meta-chip"><b>Annotation</b> GENCODE v44 ({BUILD})</span>')
+    w(f'<span class="meta-chip"><b>Contigs</b> {_E(ctx.contig_style)}-prefixed</span>')
+    if ctx.exon_only:
+        w('<span class="meta-chip meta-chip-accent"><b>Mode</b> Exon-only</span>')
     if ctx.reference:
-        _meta_item(w, "Reference", f"<code>{_E(ctx.reference)}</code>")
+        w(f'<span class="meta-chip"><b>Ref</b> <code>{_E(os.path.basename(ctx.reference))}</code></span>')
     if ctx.bed_path:
-        _meta_item(w, "Input BED", f"<code>{_E(ctx.bed_path)}</code>")
-    w("</div>")  # meta-grid
-    w("</div>")  # container
+        w(f'<span class="meta-chip"><b>BED</b> <code>{_E(os.path.basename(ctx.bed_path))}</code></span>')
+    w('</div>')  # header-meta
+    w('</div>')  # header-inner
+    # Input file path (full width below)
+    w('<div class="header-filepath">')
+    w(f'<code>{_E(ctx.bam_path)}</code>')
+    w('</div>')
     w("</header>")
 
     w('<main class="container">')
@@ -431,11 +457,6 @@ def _build_html(ctx: ReportContext) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _meta_item(w, label: str, value: str) -> None:
-    w(f'<div class="meta-item"><span class="meta-label">{label}</span>'
-      f'<span class="meta-value">{value}</span></div>')
-
-
 def _summary_card(w, title: str, value: str, color: str) -> None:
     long_cls = " sc-value-long" if len(value) > 6 else ""
     w(f'<div class="summary-card sc-{color}">'
@@ -453,11 +474,12 @@ def _metric_row(w, label: str, value: str) -> None:
 
 _CSS = """\
 :root {
-  --bg: #F7FAFA;
+  --bg: #F4F7F7;
   --card: #FFFFFF;
   --primary: #0D9488;
   --primary-light: #CCFBF1;
   --primary-dark: #0F766E;
+  --primary-deeper: #0A5F56;
   --secondary: #64748B;
   --text: #0F172A;
   --text-light: #475569;
@@ -476,45 +498,109 @@ _CSS = """\
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: 14.5px;
+  line-height: 1.6;
 }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.container { max-width: 1520px; margin: 0 auto; padding: 0 40px; }
 
-/* Header */
+/* ── Header ── */
 .header {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 40%, var(--primary-deeper) 100%);
   color: #fff;
-  padding: 32px 0;
+  padding: 0;
 }
-.header h1 { font-size: 1.75rem; margin-bottom: 16px; font-weight: 700; }
-.meta-grid { display: flex; flex-wrap: wrap; gap: 12px 28px; }
-.meta-item { display: flex; flex-direction: column; }
-.meta-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; }
-.meta-value { font-size: 0.9rem; font-weight: 500; }
-.meta-value code { background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; }
+.header-inner {
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: 28px 40px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+.header-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  border: 2px solid rgba(255,255,255,0.2);
+}
+.header-brand-text h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.header-subtitle {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(4px);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  white-space: nowrap;
+}
+.meta-chip b { opacity: 0.7; font-weight: 500; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.04em; }
+.meta-chip code { background: rgba(255,255,255,0.12); padding: 1px 5px; border-radius: 3px; font-size: 0.82em; }
+.meta-chip-accent { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.25); }
+.header-filepath {
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: 0 40px 16px;
+  opacity: 0.55;
+  font-size: 0.75rem;
+}
+.header-filepath code {
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  word-break: break-all;
+}
 
-/* Summary cards */
+/* ── Summary cards ── */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin: 28px 0;
 }
 .summary-card {
   background: var(--card);
-  border-radius: 10px;
-  padding: 18px 20px;
+  border-radius: 12px;
+  padding: 22px 24px;
   border: 1px solid var(--border);
   border-left: 4px solid var(--secondary);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s, transform 0.2s;
 }
-.sc-value { font-size: 1.5rem; font-weight: 700; color: var(--text); white-space: nowrap; line-height: 1.2; }
-.sc-value.sc-value-long { font-size: 0.95rem; }
-.sc-title { font-size: 0.78rem; color: var(--text-light); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+.summary-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.sc-value { font-size: 1.65rem; font-weight: 800; color: var(--text); white-space: nowrap; line-height: 1.15; letter-spacing: -0.02em; }
+.sc-value.sc-value-long { font-size: 0.95rem; font-weight: 700; letter-spacing: 0; }
+.sc-title { font-size: 0.72rem; color: var(--text-light); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
 .sc-primary  { border-left-color: var(--primary); }
 .sc-secondary { border-left-color: var(--secondary); }
 .sc-pass     { border-left-color: var(--status-pass); }
@@ -523,37 +609,39 @@ body {
 .sc-uneven   { border-left-color: var(--status-uneven); }
 .sc-lexon    { border-left-color: var(--status-lexon); }
 
-/* Sections */
-.section { margin: 36px 0; }
+/* ── Sections ── */
+.section { margin: 40px 0; }
 .section h2 {
-  font-size: 1.3rem;
-  margin-bottom: 14px;
-  padding-bottom: 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 2px solid var(--border);
   color: var(--text);
+  letter-spacing: -0.01em;
 }
-.section h3 { font-size: 1.1rem; margin: 18px 0 10px; color: var(--text); }
-.section-desc { color: var(--text-light); font-size: 0.9rem; margin-bottom: 16px; }
+.section h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 12px; color: var(--text); }
+.section-desc { color: var(--text-light); font-size: 0.88rem; margin-bottom: 16px; }
 
-/* Alert */
-.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
+/* ── Alert ── */
+.alert { padding: 12px 18px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88rem; }
 .alert-warning { background: var(--status-low-bg); border: 1px solid var(--status-low); color: #92400E; }
 
-/* Tables */
-.table-wrap { overflow-x: auto; }
+/* ── Tables ── */
+.table-wrap { overflow-x: auto; border-radius: 10px; }
 .data-table {
   width: 100%;
   border-collapse: collapse;
   background: var(--card);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 .data-table th, .data-table td {
-  padding: 11px 16px;
+  padding: 12px 20px;
   text-align: left;
   border-bottom: 1px solid var(--border);
-  font-size: 0.875rem;
+  font-size: 0.85rem;
 }
 .data-table thead th {
   background: var(--border-light);
@@ -564,25 +652,30 @@ body {
   position: sticky;
   top: 0;
   z-index: 2;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-light);
 }
 .data-table th.sortable:hover { background: var(--border); }
-.sort-arrow { font-size: 0.7em; opacity: 0.4; }
+.sort-arrow { font-size: 0.65em; opacity: 0.3; }
 .sort-arrow.asc::after { content: " \\25B2"; opacity: 1; }
 .sort-arrow.desc::after { content: " \\25BC"; opacity: 1; }
 .data-table tbody tr:nth-child(even) { background: var(--border-light); }
 .data-table tbody tr:hover { background: #E0F2F1; }
+.data-table tbody td { font-variant-numeric: tabular-nums; }
 
 /* Exon table - problem row */
 .exon-problem { border-left: 3px solid var(--status-lexon) !important; }
 
-/* Badges */
+/* ── Badges ── */
 .badge {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 .badge-pass   { background: var(--status-pass-bg);   color: #115E59; }
 .badge-low    { background: var(--status-low-bg);    color: #92400E; }
@@ -590,21 +683,21 @@ body {
 .badge-uneven { background: var(--status-uneven-bg); color: #1E40AF; }
 .badge-lexon  { background: var(--status-lexon-bg);  color: #5B21B6; }
 
-/* Filter bar */
-.filter-bar { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+/* ── Filter bar ── */
+.filter-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .filter-input, .filter-select {
-  padding: 8px 14px;
+  padding: 9px 16px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.875rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
   background: var(--card);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.filter-input:focus, .filter-select:focus { outline: none; border-color: var(--primary); }
-.filter-input { flex: 1; min-width: 200px; }
-.filter-select { min-width: 160px; }
+.filter-input:focus, .filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+.filter-input { flex: 1; min-width: 220px; }
+.filter-select { min-width: 170px; }
 
-/* Accordion detail cards */
+/* ── Accordion ── */
 .accordion {
   background: var(--card);
   border: 1px solid var(--border);
@@ -617,17 +710,16 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 14px 24px;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
 }
 .accordion-header:hover { background: var(--border-light); }
-.accordion-title { font-weight: 600; font-size: 1rem; }
-.accordion-summary { flex: 1; color: var(--text-light); font-size: 0.85rem; }
+.accordion-title { font-weight: 700; font-size: 1rem; }
+.accordion-summary { flex: 1; color: var(--text-light); font-size: 0.84rem; }
 .accordion-chevron {
-  width: 20px;
-  height: 20px;
+  width: 20px; height: 20px;
   flex-shrink: 0;
   position: relative;
 }
@@ -643,57 +735,51 @@ body {
   transition: transform 0.2s;
 }
 .accordion.open .accordion-chevron::before { transform: rotate(45deg); top: 2px; }
-.accordion-body {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-}
-.accordion.open .accordion-body {
-  max-height: 2000px;
-}
-.accordion-body > * { padding: 0 20px; }
+.accordion-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.accordion.open .accordion-body { max-height: 2000px; }
+.accordion-body > * { padding: 0 24px; }
 .accordion-body > *:last-child { padding-bottom: 20px; }
 
-/* Metric table (2-col inside accordion) */
+/* ── Metric table ── */
 .metric-table { width: 100%; border-collapse: collapse; margin: 4px 0 12px; }
-.metric-table td { padding: 6px 16px; font-size: 0.875rem; border-bottom: 1px dotted var(--border); }
-.metric-table .metric-label { color: var(--text-light); width: 45%; }
-.metric-table .metric-value { font-weight: 600; }
+.metric-table td { padding: 7px 20px; font-size: 0.85rem; border-bottom: 1px dotted var(--border); }
+.metric-table .metric-label { color: var(--text-light); width: 40%; }
+.metric-table .metric-value { font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Rationale */
+/* ── Rationale ── */
 .rationale {
   margin: 10px 0 0;
-  padding: 10px 14px;
-  font-size: 0.85rem;
+  padding: 10px 16px;
+  font-size: 0.84rem;
   color: var(--text-light);
   background: var(--border-light);
-  border-radius: 6px;
+  border-radius: 8px;
   border-left: 3px solid var(--border);
 }
 
-/* Gene annotation */
+/* ── Gene annotation ── */
 .gene-annotation { color: var(--secondary); }
 
-/* Exon bar chart */
+/* ── Exon bar chart ── */
 .exon-chart-container {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  padding: 24px 28px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   overflow-x: auto;
 }
 .exon-bar-row {
   display: flex;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
   font-size: 0.82rem;
 }
 .exon-bar-label {
   width: 140px;
   flex-shrink: 0;
   text-align: right;
-  padding-right: 12px;
+  padding-right: 14px;
   color: var(--text-light);
   font-weight: 500;
   white-space: nowrap;
@@ -702,87 +788,100 @@ body {
 }
 .exon-bar-track {
   flex: 1;
-  height: 22px;
+  height: 24px;
   background: var(--border-light);
-  border-radius: 4px;
+  border-radius: 5px;
   position: relative;
   min-width: 100px;
 }
 .exon-bar-fill {
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s;
+  border-radius: 5px;
+  transition: width 0.4s ease;
   min-width: 1px;
 }
 .exon-bar-pct {
-  width: 55px;
+  width: 60px;
   flex-shrink: 0;
   text-align: right;
-  padding-left: 8px;
-  font-weight: 600;
+  padding-left: 10px;
+  font-weight: 700;
   font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Glossary */
+/* ── Glossary ── */
 .glossary { margin-bottom: 32px; }
-.glossary-list { margin: 0; padding: 0; }
+.glossary-list { margin: 0; padding: 0; columns: 2; column-gap: 48px; }
 .glossary-list dt {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
-  margin-top: 12px;
-  font-size: 0.9rem;
+  margin-top: 14px;
+  font-size: 0.88rem;
+  break-after: avoid;
 }
 .glossary-list dd {
   color: var(--text-light);
   margin-left: 0;
   padding-left: 16px;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   border-left: 2px solid var(--border);
-  margin-top: 2px;
+  margin-top: 3px;
+  break-inside: avoid;
 }
 
-/* Tooltip */
+/* ── Tooltip ── */
 .tooltip {
   position: fixed;
   background: var(--text);
   color: #fff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 100;
-  max-width: 280px;
+  max-width: 300px;
   line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-/* Footer */
+/* ── Footer ── */
 .footer {
   text-align: center;
-  padding: 24px 0;
-  margin-top: 40px;
+  padding: 28px 0;
+  margin-top: 48px;
   border-top: 1px solid var(--border);
   color: var(--secondary);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
-/* Responsive */
-@media (max-width: 700px) {
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .container { padding: 0 20px; }
+  .header-inner { padding: 20px 20px 16px; flex-direction: column; align-items: flex-start; }
+  .header-meta { justify-content: flex-start; }
+  .header-filepath { padding: 0 20px 12px; }
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
-  .meta-grid { gap: 8px 16px; }
+  .glossary-list { columns: 1; }
+}
+@media (max-width: 600px) {
+  .summary-cards { grid-template-columns: 1fr; }
   .exon-bar-label { width: 90px; font-size: 0.75rem; }
   .accordion-summary { display: none; }
+  .header-logo { width: 56px; height: 56px; }
 }
 
-/* Print */
+/* ── Print ── */
 @media print {
   .header { background: var(--primary) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .accordion-body { max-height: none !important; }
   .accordion-chevron { display: none; }
   .filter-bar { display: none; }
   .tooltip { display: none; }
-  body { font-size: 12px; }
+  body { font-size: 11px; }
+  .container { max-width: 100%; padding: 0 16px; }
   .summary-card, .accordion, .data-table { break-inside: avoid; }
 }
 """

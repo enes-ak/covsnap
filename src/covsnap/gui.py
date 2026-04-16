@@ -176,7 +176,7 @@ class CovSnapGUI:
         row = 13
         ttk.Label(root, text="Engine:").grid(row=row, column=0, sticky="e", **pad)
         engine_combo = ttk.Combobox(root, textvariable=self.engine_var,
-                                     values=["auto", "samtools", "mosdepth"],
+                                     values=["auto", "pysam", "samtools", "mosdepth"],
                                      state="readonly", width=15)
         engine_combo.grid(row=row, column=1, sticky="w", **pad)
 

@@ -127,9 +127,9 @@ def build_parser() -> argparse.ArgumentParser:
     eng = parser.add_argument_group("Engine options")
     eng.add_argument(
         "--engine",
-        choices=["auto", "mosdepth", "samtools"],
+        choices=["auto", "pysam", "mosdepth", "samtools"],
         default="auto",
-        help="Depth computation engine (default: auto).",
+        help="Depth computation engine (default: auto). pysam is fastest (no subprocess).",
     )
     eng.add_argument(
         "--threads",
@@ -321,7 +321,10 @@ def _error(message: str, code: int = 1) -> None:
 def _get_engine_version(engine: str) -> str:
     """Get version string for the active engine."""
     try:
-        if engine == "mosdepth":
+        if engine == "pysam":
+            import pysam
+            return pysam.__version__
+        elif engine == "mosdepth":
             proc = subprocess.run(
                 ["mosdepth", "--version"],
                 capture_output=True, text=True,

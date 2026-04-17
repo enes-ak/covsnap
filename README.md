@@ -26,9 +26,7 @@
 
 ## Demo
 
-<p align="center">
-  <video src="https://github.com/enes-ak/covsnap/releases/download/v0.3.0/covsnap-demo.mp4" width="800" controls muted playsinline></video>
-</p>
+https://github.com/user-attachments/assets/18f64237-9897-4f9a-9c07-8696fd2ca04d
 
 ## Screenshots
 

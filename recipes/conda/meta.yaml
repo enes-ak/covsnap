@@ -1,5 +1,5 @@
 {% set name = "covsnap" %}
-{% set version = "0.2.0" %}
+{% set version = "0.4.0" %}
 
 package:
   name: {{ name }}
@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://github.com/enes-ak/covsnap/archive/v{{ version }}.tar.gz
-  sha256: bc06be36499d1054c78c2832141ebaa960f622c3aa49dd0efe1692c93af592fe
+  sha256: 95233c74278b408b5f52d9ee58f5af2cd5fc88674056ea8a876c2a4b915ef305
 
 build:
   number: 0

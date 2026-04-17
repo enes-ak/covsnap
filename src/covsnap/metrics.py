@@ -85,6 +85,8 @@ class TargetAccumulator:
         self.end = end
         self.expected_length = end - start
         self.thresholds = sorted(thresholds)
+        self._threshold_min = self.thresholds[0] if self.thresholds else 0
+        self._threshold_max = self.thresholds[-1] if self.thresholds else 0
         self.lowcov_threshold = lowcov_threshold
         self.lowcov_min_len = lowcov_min_len
 
@@ -98,6 +100,7 @@ class TargetAccumulator:
 
         # Histogram: depth → base count (exact for median computation)
         self._histogram: dict[int, int] = defaultdict(int)
+        self._sorted_keys: list[int] | None = None  # invalidated on update
 
         # Threshold counts: how many bases >= each threshold
         self._threshold_counts: dict[int, int] = {t: 0 for t in self.thresholds}
@@ -177,11 +180,18 @@ class TargetAccumulator:
 
         # Histogram
         self._histogram[depth] += count
+        self._sorted_keys = None
 
-        # Threshold counts
-        for t in self.thresholds:
-            if depth >= t:
+        # Threshold counts (short-circuit: thresholds are sorted ascending)
+        if depth >= self._threshold_max:
+            for t in self.thresholds:
                 self._threshold_counts[t] += count
+        elif depth >= self._threshold_min:
+            for t in self.thresholds:
+                if depth >= t:
+                    self._threshold_counts[t] += count
+                else:
+                    break
 
         if depth == 0:
             self._zero_count += count
@@ -293,7 +303,9 @@ class TargetAccumulator:
         cumulative = 0
         prev_depth = 0
 
-        for depth in sorted(self._histogram.keys()):
+        if self._sorted_keys is None:
+            self._sorted_keys = sorted(self._histogram.keys())
+        for depth in self._sorted_keys:
             cumulative += self._histogram[depth]
             if cumulative >= mid:
                 if total % 2 == 1:

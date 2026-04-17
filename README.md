@@ -24,6 +24,10 @@
 
 ---
 
+## Demo
+
+https://github.com/enes-ak/covsnap/releases/download/v0.3.0/covsnap-demo.mp4
+
 ## Screenshots
 
 ### Interactive HTML Report

@@ -17,7 +17,7 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional
 
-from covsnap.metrics import TargetAccumulator, TargetResult
+from covsnap.metrics import LowCovBlock, TargetAccumulator, TargetResult
 
 logger = logging.getLogger(__name__)
 
@@ -28,18 +28,21 @@ def select_engine(engine: str) -> str:
     Parameters
     ----------
     engine : str
-        One of ``"auto"``, ``"mosdepth"``, ``"samtools"``.
+        One of ``"auto"``, ``"mosdepth"``, ``"samtools"``, ``"pysam"``.
 
     Returns
     -------
     str
-        The selected engine name (``"mosdepth"`` or ``"samtools"``).
+        The selected engine name.
 
     Raises
     ------
     RuntimeError
         If the requested engine (or any engine in auto mode) is not found.
     """
+    if engine == "pysam":
+        return "pysam"
+
     if engine == "mosdepth":
         if shutil.which("mosdepth"):
             return "mosdepth"
@@ -52,18 +55,9 @@ def select_engine(engine: str) -> str:
             return "samtools"
         raise RuntimeError("samtools not found on PATH.")
 
-    # auto mode
-    if shutil.which("mosdepth"):
-        logger.info("Auto-selected engine: mosdepth")
-        return "mosdepth"
-    if shutil.which("samtools"):
-        logger.info("Auto-selected engine: samtools")
-        return "samtools"
-
-    raise RuntimeError(
-        "Neither mosdepth nor samtools found on PATH. "
-        "Install at least one: conda install -c bioconda samtools"
-    )
+    # auto mode: pysam first (fastest, no subprocess), then mosdepth, then samtools
+    logger.info("Auto-selected engine: pysam")
+    return "pysam"
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +150,12 @@ def compute_depth(
         tmp_dir = tempfile.mkdtemp(prefix="covsnap_")
 
     try:
-        if engine == "samtools":
+        if engine == "pysam":
+            return _run_pysam(
+                bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
+                reference,
+            )
+        elif engine == "samtools":
             return _run_samtools_parallel(
                 bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
                 threads, tmp_dir, reference,
@@ -479,6 +478,149 @@ def _stream_mosdepth_perbase(
         results[orig_idx] = res
 
     return results  # type: ignore[return-value]
+
+
+# ---------------------------------------------------------------------------
+# pysam engine — direct API, no subprocess
+# ---------------------------------------------------------------------------
+
+
+def _run_pysam(
+    bam_path: str,
+    targets: list[_TargetSpec],
+    thresholds: list[int],
+    lowcov_threshold: int,
+    lowcov_min_len: int,
+    reference: Optional[str],
+) -> list[TargetResult]:
+    """Compute depth via pysam count_coverage (no subprocess needed)."""
+    import numpy as np
+    import pysam
+
+    sorted_thresholds = sorted(thresholds)
+
+    open_kwargs: dict = {"mode": "rb"}
+    if reference:
+        open_kwargs["reference_filename"] = reference
+
+    try:
+        af = pysam.AlignmentFile(bam_path, **open_kwargs)
+    except Exception as exc:
+        raise RuntimeError(f"pysam failed to open {bam_path}: {exc}") from exc
+
+    results: list[TargetResult] = []
+    try:
+        for t in targets:
+            try:
+                cov = af.count_coverage(
+                    t.contig, t.start, t.end,
+                    quality_threshold=0, read_callback="all",
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"pysam count_coverage failed for {t.contig}:{t.start}-{t.end}: {exc}"
+                ) from exc
+
+            depths = (
+                np.array(cov[0], dtype=np.int32)
+                + np.array(cov[1], dtype=np.int32)
+                + np.array(cov[2], dtype=np.int32)
+                + np.array(cov[3], dtype=np.int32)
+            )
+
+            length = len(depths)
+            if length == 0:
+                results.append(_empty_result(t, sorted_thresholds))
+                continue
+
+            mean_depth = float(depths.mean())
+            stdev_depth = float(depths.std())
+            min_depth = int(depths.min())
+            max_depth = int(depths.max())
+            median_depth = float(np.median(depths))
+            zero_count = int(np.sum(depths == 0))
+            pct_zero = zero_count / length * 100
+
+            pct_thresholds = {}
+            for th in sorted_thresholds:
+                pct_thresholds[th] = round(float(np.sum(depths >= th)) / length * 100, 2)
+
+            # Histogram for merge compatibility
+            unique, counts = np.unique(depths, return_counts=True)
+            histogram = dict(zip(unique.tolist(), counts.tolist()))
+
+            # Low-coverage blocks
+            lowcov_blocks = _detect_lowcov_blocks(
+                depths, t.start, lowcov_threshold, lowcov_min_len,
+            )
+            lowcov_total_bp = sum(b.length for b in lowcov_blocks)
+
+            results.append(TargetResult(
+                target_id=t.target_id,
+                contig=t.contig,
+                start=t.start,
+                end=t.end,
+                length_bp=length,
+                mean_depth=round(mean_depth, 2),
+                median_depth=round(median_depth, 1),
+                min_depth=min_depth,
+                max_depth=max_depth,
+                stdev_depth=round(stdev_depth, 2),
+                pct_zero=round(pct_zero, 2),
+                pct_thresholds=pct_thresholds,
+                n_lowcov_blocks=len(lowcov_blocks),
+                lowcov_total_bp=lowcov_total_bp,
+                lowcov_blocks=lowcov_blocks,
+                histogram=histogram,
+            ))
+    finally:
+        af.close()
+
+    return results
+
+
+def _empty_result(t: _TargetSpec, thresholds: list[int]) -> TargetResult:
+    """Return a zero-filled TargetResult for an empty region."""
+    return TargetResult(
+        target_id=t.target_id, contig=t.contig, start=t.start, end=t.end,
+        length_bp=0, mean_depth=0, median_depth=0, min_depth=0, max_depth=0,
+        stdev_depth=0, pct_zero=0,
+        pct_thresholds={th: 0.0 for th in thresholds},
+        n_lowcov_blocks=0, lowcov_total_bp=0, lowcov_blocks=[],
+    )
+
+
+def _detect_lowcov_blocks(
+    depths,  # numpy array
+    region_start: int,
+    lowcov_threshold: int,
+    lowcov_min_len: int,
+) -> list[LowCovBlock]:
+    """Detect contiguous low-coverage blocks from a numpy depth array."""
+    import numpy as np
+
+    is_low = depths < lowcov_threshold
+    if not np.any(is_low):
+        return []
+
+    blocks: list[LowCovBlock] = []
+    # Find transitions
+    padded = np.concatenate([[False], is_low, [False]])
+    diff = np.diff(padded.astype(np.int8))
+    starts = np.where(diff == 1)[0]
+    ends = np.where(diff == -1)[0]
+
+    for s, e in zip(starts, ends):
+        block_len = e - s
+        if block_len >= lowcov_min_len:
+            block_depths = depths[s:e]
+            blocks.append(LowCovBlock(
+                start=region_start + int(s),
+                end=region_start + int(e),
+                depth_sum=int(block_depths.sum()),
+                length=block_len,
+            ))
+    return blocks
 
 
 def ensure_index(bam_path: str, no_index: bool = False) -> None:

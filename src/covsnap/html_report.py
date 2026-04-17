@@ -211,7 +211,7 @@ def _build_html(ctx: ReportContext) -> str:
     if exon_bar_data:
         w('<section class="section">')
         w("<h2>Exon Coverage Overview</h2>")
-        w('<p class="section-desc">Horizontal bars show %&ge;20x coverage per exon. '
+        w('<p class="section-desc">Horizontal bars show mean depth per exon. '
           'Color indicates quality: teal (adequate) to amber (warning) to red (poor).</p>')
         w('<div class="exon-chart-container" id="exon-chart-container"></div>')
         w("</section>")
@@ -907,10 +907,17 @@ _JS = r"""
   }
   function hideTip() { tip.style.opacity = "0"; }
 
-  // -- Exon horizontal bar chart --
+  // -- Exon horizontal bar chart (mean depth) --
   (function() {
     var container = document.getElementById("exon-chart-container");
     if (!container || EXON_BAR_DATA.length === 0) return;
+
+    // Find max mean depth for scaling
+    var maxMean = 0;
+    EXON_BAR_DATA.forEach(function(d) {
+      if (d.mean > maxMean) maxMean = d.mean;
+    });
+    if (maxMean === 0) maxMean = 1;
 
     EXON_BAR_DATA.forEach(function(d) {
       var row = document.createElement("div");
@@ -927,33 +934,33 @@ _JS = r"""
 
       var fill = document.createElement("div");
       fill.className = "exon-bar-fill";
-      var pct = Math.min(d.pct20, 100);
-      fill.style.width = pct + "%";
+      var barPct = Math.min(d.mean / maxMean * 100, 100);
+      fill.style.width = barPct + "%";
 
-      // Smooth color gradient using HSL interpolation
-      // 0% → hsl(0, 65%, 45%)   deep red
-      // 50% → hsl(35, 75%, 48%)  amber
-      // 80% → hsl(168, 60%, 40%) muted teal
-      // 100% → hsl(173, 80%, 30%) deep teal (matches --primary)
+      // Color based on mean depth thresholds:
+      // 0-10x  → red (poor)
+      // 10-20x → amber (warning)
+      // 20-50x → muted teal (adequate)
+      // 50x+   → deep teal (excellent)
       var h, s, l;
-      if (pct <= 50) {
-        // red → amber (hue 0 → 35)
-        var t = pct / 50;
+      var depth = d.mean;
+      if (depth <= 10) {
+        var t = depth / 10;
         h = 0 + t * 35;
         s = 65 + t * 10;
         l = 45 + t * 3;
-      } else if (pct <= 80) {
-        // amber → muted teal (hue 35 → 168)
-        var t = (pct - 50) / 30;
+      } else if (depth <= 20) {
+        var t = (depth - 10) / 10;
         h = 35 + t * 133;
         s = 75 - t * 15;
         l = 48 - t * 8;
-      } else {
-        // muted teal → deep teal (hue 168 → 173)
-        var t = (pct - 80) / 20;
+      } else if (depth <= 50) {
+        var t = (depth - 20) / 30;
         h = 168 + t * 5;
-        s = 60 + t * 20;
-        l = 40 - t * 10;
+        s = 60 + t * 10;
+        l = 40 - t * 5;
+      } else {
+        h = 173; s = 80; l = 30;
       }
       var color = "hsl(" + Math.round(h) + "," + Math.round(s) + "%," + Math.round(l) + "%)";
       fill.style.background = color;
@@ -961,15 +968,15 @@ _JS = r"""
       track.appendChild(fill);
       row.appendChild(track);
 
-      var pctLabel = document.createElement("div");
-      pctLabel.className = "exon-bar-pct";
-      pctLabel.textContent = d.pct20.toFixed(1) + "%";
-      pctLabel.style.color = "hsl(" + Math.round(h) + "," + Math.round(s) + "%," + Math.round(Math.max(l - 8, 20)) + "%)";
-      row.appendChild(pctLabel);
+      var depthLabel = document.createElement("div");
+      depthLabel.className = "exon-bar-pct";
+      depthLabel.textContent = d.mean.toFixed(1) + "x";
+      depthLabel.style.color = "hsl(" + Math.round(h) + "," + Math.round(s) + "%," + Math.round(Math.max(l - 8, 20)) + "%)";
+      row.appendChild(depthLabel);
 
       // Tooltip on hover
       row.addEventListener("mousemove", function(e) {
-        showTip(e, "<b>" + d.gene + " exon " + d.exon + "</b><br>%\u226520x: " + d.pct20.toFixed(1) + "%<br>Mean: " + d.mean.toFixed(1) + "x");
+        showTip(e, "<b>" + d.gene + " exon " + d.exon + "</b><br>Mean depth: " + d.mean.toFixed(1) + "x<br>%\u226520x: " + d.pct20.toFixed(1) + "%");
       });
       row.addEventListener("mouseleave", hideTip);
 

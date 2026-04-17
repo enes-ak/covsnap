@@ -127,9 +127,9 @@ def build_parser() -> argparse.ArgumentParser:
     eng = parser.add_argument_group("Engine options")
     eng.add_argument(
         "--engine",
-        choices=["auto", "mosdepth", "samtools"],
+        choices=["auto", "pysam", "mosdepth", "samtools"],
         default="auto",
-        help="Depth computation engine (default: auto).",
+        help="Depth computation engine (default: auto). pysam is fastest (no subprocess).",
     )
     eng.add_argument(
         "--threads",
@@ -321,7 +321,10 @@ def _error(message: str, code: int = 1) -> None:
 def _get_engine_version(engine: str) -> str:
     """Get version string for the active engine."""
     try:
-        if engine == "mosdepth":
+        if engine == "pysam":
+            import pysam
+            return pysam.__version__
+        elif engine == "mosdepth":
             proc = subprocess.run(
                 ["mosdepth", "--version"],
                 capture_output=True, text=True,
@@ -519,20 +522,35 @@ def _run_pipeline(args: argparse.Namespace) -> None:
     logger.info("Processing %d target region(s)", len(regions))
 
     # ── Compute depth metrics ──
-    try:
-        results = compute_depth(
-            bam_path=args.alignment,
-            regions=regions,
-            engine=engine,
-            thresholds=thresholds,
-            lowcov_threshold=args.lowcov_threshold,
-            lowcov_min_len=args.lowcov_min_len,
-            threads=args.threads,
-            reference=args.reference,
-        )
-    except RuntimeError as exc:
-        _error(str(exc), code=2)
-        return
+    skip_full_gene = args.exon_only and gene_names_resolved
+    if skip_full_gene:
+        # --exon-only: skip expensive full-gene depth; create placeholders
+        # that will be replaced by exon-merged results below.
+        results = [
+            TargetResult(
+                target_id=name, contig=contig, start=start, end=end,
+                length_bp=end - start, mean_depth=0, median_depth=0,
+                min_depth=0, max_depth=0, stdev_depth=0, pct_zero=0,
+                pct_thresholds={t: 0 for t in thresholds},
+                n_lowcov_blocks=0, lowcov_total_bp=0, lowcov_blocks=[],
+            )
+            for contig, start, end, name in regions
+        ]
+    else:
+        try:
+            results = compute_depth(
+                bam_path=args.alignment,
+                regions=regions,
+                engine=engine,
+                thresholds=thresholds,
+                lowcov_threshold=args.lowcov_threshold,
+                lowcov_min_len=args.lowcov_min_len,
+                threads=args.threads,
+                reference=args.reference,
+            )
+        except RuntimeError as exc:
+            _error(str(exc), code=2)
+            return
 
     # Attach shared metadata
     for r in results:
@@ -551,6 +569,9 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         exon_metadata_map = exon_metadata_map or {}
         exon_status_map = exon_status_map or {}
         params = _build_classify_params(args)
+
+        # Build exon jobs for all genes
+        exon_jobs: list[tuple[str, list[tuple[str, int, int, str]], list[dict[str, Any]]]] = []
         for gene_name in gene_names_resolved:
             exon_records = lookup_exons(gene_name)
             if not exon_records:
@@ -568,31 +589,63 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                 )
                 for e in exon_records
             ]
-            try:
-                exon_depth_results = compute_depth(
-                    bam_path=args.alignment,
-                    regions=exon_regions,
-                    engine=engine,
-                    thresholds=thresholds,
-                    lowcov_threshold=args.lowcov_threshold,
-                    lowcov_min_len=args.lowcov_min_len,
-                    threads=args.threads,
-                    reference=args.reference,
-                )
-                for er in exon_depth_results:
-                    er.engine_used = engine
-                    er.bam_path = args.alignment
-                    er.sample_name = sample_name
+            exon_jobs.append((gene_name, exon_regions, exon_records))
 
-                exon_results_map[gene_name] = exon_depth_results
-                exon_metadata_map[gene_name] = exon_records
-                exon_statuses = [classify_exon(er, params) for er in exon_depth_results]
-                exon_status_map[gene_name] = exon_statuses
-            except RuntimeError as exc:
-                logger.warning("Exon-level analysis failed for %s: %s", gene_name, exc)
+        # Run exon depth in parallel across genes
+        if exon_jobs:
+            n_workers = min(args.threads, len(exon_jobs))
+            if n_workers <= 1:
+                # Single gene: run directly, use all threads
+                for gname, exon_regs, exon_recs in exon_jobs:
+                    try:
+                        exon_depth_results = compute_depth(
+                            bam_path=args.alignment, regions=exon_regs,
+                            engine=engine, thresholds=thresholds,
+                            lowcov_threshold=args.lowcov_threshold,
+                            lowcov_min_len=args.lowcov_min_len,
+                            threads=args.threads, reference=args.reference,
+                        )
+                        for er in exon_depth_results:
+                            er.engine_used = engine
+                            er.bam_path = args.alignment
+                            er.sample_name = sample_name
+                        exon_results_map[gname] = exon_depth_results
+                        exon_metadata_map[gname] = exon_recs
+                        exon_status_map[gname] = [classify_exon(er, params) for er in exon_depth_results]
+                    except RuntimeError as exc:
+                        logger.warning("Exon-level analysis failed for %s: %s", gname, exc)
+            else:
+                logger.info("Parallel exon analysis: %d genes across %d workers", len(exon_jobs), n_workers)
+                with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                    futures = {}
+                    for gname, exon_regs, exon_recs in exon_jobs:
+                        future = pool.submit(
+                            compute_depth,
+                            bam_path=args.alignment, regions=exon_regs,
+                            engine=engine, thresholds=thresholds,
+                            lowcov_threshold=args.lowcov_threshold,
+                            lowcov_min_len=args.lowcov_min_len,
+                            threads=1, reference=args.reference,
+                        )
+                        futures[future] = (gname, exon_recs)
+
+                    for future in as_completed(futures):
+                        gname, exon_recs = futures[future]
+                        try:
+                            exon_depth_results = future.result()
+                            for er in exon_depth_results:
+                                er.engine_used = engine
+                                er.bam_path = args.alignment
+                                er.sample_name = sample_name
+                            exon_results_map[gname] = exon_depth_results
+                            exon_metadata_map[gname] = exon_recs
+                            exon_status_map[gname] = [classify_exon(er, params) for er in exon_depth_results]
+                        except RuntimeError as exc:
+                            logger.warning("Exon-level analysis failed for %s: %s", gname, exc)
 
         # ── Exon-only: replace gene-level results with exon-aggregated ones ──
         if args.exon_only and exon_results_map:
+            fallback_regions = []
             for i, (contig, start, end, name) in enumerate(regions):
                 if name in exon_results_map:
                     merged = merge_exon_results(
@@ -606,6 +659,31 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                         "%s: exon-only metrics — %d exonic bp (was %d gene bp)",
                         name, merged.length_bp, end - start,
                     )
+                elif skip_full_gene:
+                    fallback_regions.append((i, contig, start, end, name))
+
+            # Fallback: genes with no exon data need full-gene depth
+            if fallback_regions:
+                fb_regions = [(c, s, e, n) for _, c, s, e, n in fallback_regions]
+                try:
+                    fb_results = compute_depth(
+                        bam_path=args.alignment, regions=fb_regions,
+                        engine=engine, thresholds=thresholds,
+                        lowcov_threshold=args.lowcov_threshold,
+                        lowcov_min_len=args.lowcov_min_len,
+                        threads=args.threads, reference=args.reference,
+                    )
+                    for (orig_i, _, _, _, _), fb_r in zip(fallback_regions, fb_results):
+                        fb_r.engine_used = engine
+                        fb_r.bam_path = args.alignment
+                        fb_r.sample_name = sample_name
+                        results[orig_i] = fb_r
+                        logger.warning(
+                            "%s: no exon data found, using full-gene depth",
+                            fb_r.target_id,
+                        )
+                except RuntimeError as exc:
+                    _error(str(exc), code=2)
 
     # ── Region → gene/exon overlay (region mode) ──
     gene_results_list: Optional[list[TargetResult]] = None

@@ -12,7 +12,7 @@ class TestEngineSelection:
 
     def test_auto_selects_something(self):
         engine = select_engine("auto")
-        assert engine in ("mosdepth", "samtools")
+        assert engine in ("pysam", "mosdepth", "samtools")
 
     def test_explicit_samtools(self):
         if not shutil.which("samtools"):

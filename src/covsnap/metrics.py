@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -197,7 +196,7 @@ class TargetAccumulator:
             self._zero_count += count
 
         # Low-coverage block tracking
-        block_end = block_start + count
+        block_start + count
         if depth < self.lowcov_threshold:
             if not self._in_lowcov:
                 # Start new low-cov block
@@ -382,12 +381,12 @@ def merge_exon_results(
         if combined_n == 0:
             combined_n = n_i
             combined_mean = er.mean_depth
-            combined_m2 = er.stdev_depth ** 2 * n_i
+            combined_m2 = er.stdev_depth**2 * n_i
         else:
             delta = er.mean_depth - combined_mean
             new_n = combined_n + n_i
             combined_mean = (combined_n * combined_mean + n_i * er.mean_depth) / new_n
-            combined_m2 += er.stdev_depth ** 2 * n_i + delta ** 2 * combined_n * n_i / new_n
+            combined_m2 += er.stdev_depth**2 * n_i + delta**2 * combined_n * n_i / new_n
             combined_n = new_n
 
     # Compute final metrics

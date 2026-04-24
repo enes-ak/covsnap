@@ -167,9 +167,7 @@ def enforce_limits(
     if stats.exceeds_bp:
         limit_msgs.append(f"total bp ({stats.total_bp:,}) exceeds --max-total-bp ({max_total_bp:,})")
     if stats.exceeds_bytes:
-        limit_msgs.append(
-            f"file size ({stats.file_bytes:,} bytes) exceeds --max-bed-bytes ({max_bed_bytes:,})"
-        )
+        limit_msgs.append(f"file size ({stats.file_bytes:,} bytes) exceeds --max-bed-bytes ({max_bed_bytes:,})")
     detail = "; ".join(limit_msgs)
 
     if on_large_bed == "error":

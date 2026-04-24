@@ -14,10 +14,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from covsnap import ANNOTATION_VERSION, BUILD, __version__
-from covsnap.metrics import TargetResult
-from covsnap.report import ClassifyParams, ReportContext, _rationale, _status_description
-
+from covsnap import BUILD, __version__
+from covsnap.report import ReportContext, _rationale, _status_description
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -55,7 +53,12 @@ def _load_logo_b64() -> str:
 
 def _format_date(raw: str) -> str:
     """Convert ISO date like '2026-04-07T11:48:18Z' to '07/04/2026 11:48:18'."""
-    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S %Z", "%Y-%m-%d %H:%M:%S %Z", "%Y-%m-%d %H:%M:%S"):
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S %Z",
+        "%Y-%m-%d %H:%M:%S %Z",
+        "%Y-%m-%d %H:%M:%S",
+    ):
         try:
             dt = datetime.strptime(raw, fmt)
             return dt.strftime("%d/%m/%Y %H:%M:%S")
@@ -126,14 +129,16 @@ def _build_html(ctx: ReportContext) -> str:
             for i, er in enumerate(exons):
                 meta = meta_list[i] if i < len(meta_list) else {}
                 status = status_list[i] if i < len(status_list) else "OK"
-                exon_bar_data.append({
-                    "gene": gene,
-                    "exon": meta.get("exon_number", i + 1),
-                    "exon_id": meta.get("exon_id", er.target_id),
-                    "pct20": round(er.pct_thresholds.get(20, 0.0), 2),
-                    "mean": round(er.mean_depth, 2),
-                    "status": status,
-                })
+                exon_bar_data.append(
+                    {
+                        "gene": gene,
+                        "exon": meta.get("exon_number", i + 1),
+                        "exon_id": meta.get("exon_id", er.target_id),
+                        "pct20": round(er.pct_thresholds.get(20, 0.0), 2),
+                        "mean": round(er.mean_depth, 2),
+                        "status": status,
+                    }
+                )
         # Sort by exon number ascending
         exon_bar_data.sort(key=lambda d: (d["gene"], d["exon"]))
 
@@ -162,9 +167,9 @@ def _build_html(ctx: ReportContext) -> str:
     if logo_b64:
         w(f'<img src="{logo_b64}" alt="covsnap" class="header-logo">')
     w('<div class="header-brand-text">')
-    w('<h1>covsnap</h1>')
+    w("<h1>covsnap</h1>")
     w('<p class="header-subtitle">Coverage Report</p>')
-    w('</div></div>')
+    w("</div></div>")
     # Meta chips on the right
     w('<div class="header-meta">')
     w(f'<span class="meta-chip"><b>Sample</b> {_E(ctx.sample_name)}</span>')
@@ -178,12 +183,12 @@ def _build_html(ctx: ReportContext) -> str:
         w(f'<span class="meta-chip"><b>Ref</b> <code>{_E(os.path.basename(ctx.reference))}</code></span>')
     if ctx.bed_path:
         w(f'<span class="meta-chip"><b>BED</b> <code>{_E(os.path.basename(ctx.bed_path))}</code></span>')
-    w('</div>')  # header-meta
-    w('</div>')  # header-inner
+    w("</div>")  # header-meta
+    w("</div>")  # header-inner
     # Input file path (full width below)
     w('<div class="header-filepath">')
-    w(f'<code>{_E(ctx.bam_path)}</code>')
-    w('</div>')
+    w(f"<code>{_E(ctx.bam_path)}</code>")
+    w("</div>")
     w("</header>")
 
     w('<main class="container">')
@@ -193,12 +198,15 @@ def _build_html(ctx: ReportContext) -> str:
     _summary_card(w, "Overall Mean Depth", f"{overall_mean:.1f}x", "primary")
     _summary_card(w, "Overall %&ge;20x", f"{overall_pct20:.1f}%", "primary")
     _summary_card(w, "Targets Analyzed", str(total), "secondary")
-    _summary_card(w, "PASS Rate", f"{pass_rate:.0f}%",
-                  "pass" if pass_rate >= 90 else ("low" if pass_rate >= 50 else "drop"))
+    _summary_card(
+        w,
+        "PASS Rate",
+        f"{pass_rate:.0f}%",
+        "pass" if pass_rate >= 90 else ("low" if pass_rate >= 50 else "drop"),
+    )
     _summary_card(w, "Worst Status", worst_status, _status_css_class(worst_status))
     if ctx.exon_results:
-        _summary_card(w, "Low Exons", str(n_low_exons),
-                      "pass" if n_low_exons == 0 else "drop")
+        _summary_card(w, "Low Exons", str(n_low_exons), "pass" if n_low_exons == 0 else "drop")
     w("</section>")
 
     # -- BED Guardrails --
@@ -211,8 +219,10 @@ def _build_html(ctx: ReportContext) -> str:
     if exon_bar_data:
         w('<section class="section">')
         w("<h2>Exon Coverage Overview</h2>")
-        w('<p class="section-desc">Horizontal bars show mean depth per exon. '
-          'Color indicates quality: teal (adequate) to amber (warning) to red (poor).</p>')
+        w(
+            '<p class="section-desc">Horizontal bars show mean depth per exon. '
+            "Color indicates quality: teal (adequate) to amber (warning) to red (poor).</p>"
+        )
         w('<div class="exon-chart-container" id="exon-chart-container"></div>')
         w("</section>")
 
@@ -234,7 +244,16 @@ def _build_html(ctx: ReportContext) -> str:
     w('<div class="table-wrap">')
     w('<table class="data-table" id="target-table">')
     w("<thead><tr>")
-    headers = ["Target", "Region (1-based)", "Length", "Mean Depth", "Median", "%&ge;20x", "%Zero", "Status"]
+    headers = [
+        "Target",
+        "Region (1-based)",
+        "Length",
+        "Mean Depth",
+        "Median",
+        "%&ge;20x",
+        "%Zero",
+        "Status",
+    ]
     for i, h in enumerate(headers):
         w(f'<th data-col="{i}" class="sortable">{h} <span class="sort-arrow"></span></th>')
     w("</tr></thead>")
@@ -263,7 +282,7 @@ def _build_html(ctx: ReportContext) -> str:
         is_problem = r.coverage_status != "PASS"
         open_cls = " open" if is_problem else ""
         w(f'<div class="accordion{open_cls}" id="detail-{_E(r.target_id)}">')
-        w(f'<div class="accordion-header" onclick="this.parentElement.classList.toggle(\'open\')">')
+        w('<div class="accordion-header" onclick="this.parentElement.classList.toggle(\'open\')">')
         w(f'<span class="accordion-title">{_E(r.target_id)}</span>')
         w(f'<span class="badge badge-{_status_css_class(r.coverage_status)}">{_E(r.coverage_status)}</span>')
         w(f'<span class="accordion-summary">{_E(_status_description(r.coverage_status))}</span>')
@@ -284,7 +303,9 @@ def _build_html(ctx: ReportContext) -> str:
         _metric_row(w, "Low-cov blocks", f"{r.n_lowcov_blocks} blocks, {r.lowcov_total_bp:,} bp")
         w("</tbody>")
         w("</table>")
-        w(f'<div class="rationale"><strong>Classification rationale:</strong> {_E(_rationale(r, ctx.classify_params))}</div>')
+        w(
+            f'<div class="rationale"><strong>Classification rationale:</strong> {_E(_rationale(r, ctx.classify_params))}</div>'
+        )
         w("</div>")  # accordion-body
         w("</div>")  # accordion
     w("</section>")
@@ -316,7 +337,9 @@ def _build_html(ctx: ReportContext) -> str:
             w(f"<td>{gr.median_depth:.0f}</td>")
             w(f"<td>{pct20:.2f}%</td>")
             w(f"<td>{gr.pct_zero:.2f}%</td>")
-            w(f'<td><span class="badge badge-{_status_css_class(gr.coverage_status)}">{_E(gr.coverage_status)}</span></td>')
+            w(
+                f'<td><span class="badge badge-{_status_css_class(gr.coverage_status)}">{_E(gr.coverage_status)}</span></td>'
+            )
             w("</tr>")
         w("</tbody></table>")
         w("</div>")
@@ -339,12 +362,14 @@ def _build_html(ctx: ReportContext) -> str:
                 exon_id = meta.get("exon_id", er.target_id)
                 status = status_list[i] if i < len(status_list) else "OK"
                 exon_rows.append((exon_num, exon_id, er, status))
-            exon_rows.sort(key=lambda x: (x[0] if isinstance(x[0], int) else 0))
+            exon_rows.sort(key=lambda x: x[0] if isinstance(x[0], int) else 0)
 
             w('<div class="table-wrap">')
             w('<table class="data-table exon-table">')
-            w("<thead><tr><th>Exon</th><th>Exon ID</th><th>Region</th><th>Length</th>"
-              "<th>Mean</th><th>%&ge;20x</th><th>%Zero</th><th>Flag</th></tr></thead>")
+            w(
+                "<thead><tr><th>Exon</th><th>Exon ID</th><th>Region</th><th>Length</th>"
+                "<th>Mean</th><th>%&ge;20x</th><th>%Zero</th><th>Flag</th></tr></thead>"
+            )
             w("<tbody>")
             for exon_num, exon_id, er, status in exon_rows:
                 pct20 = er.pct_thresholds.get(20, 0.0)
@@ -357,7 +382,9 @@ def _build_html(ctx: ReportContext) -> str:
                 w(f"<td>{er.mean_depth:.2f}</td>")
                 w(f"<td>{pct20:.2f}%</td>")
                 w(f"<td>{er.pct_zero:.2f}%</td>")
-                w(f'<td><span class="badge badge-{"lexon" if status == "LOW_EXON" else "pass"}">{_E(status)}</span></td>')
+                w(
+                    f'<td><span class="badge badge-{"lexon" if status == "LOW_EXON" else "pass"}">{_E(status)}</span></td>'
+                )
                 w("</tr>")
             w("</tbody></table>")
             w("</div>")
@@ -396,16 +423,26 @@ def _build_html(ctx: ReportContext) -> str:
     w('<table class="data-table">')
     w("<thead><tr><th>Status</th><th>Rule</th></tr></thead>")
     w("<tbody>")
-    w(f'<tr><td><span class="badge badge-pass">PASS</span></td>'
-      f"<td>pct_ge_20 &ge; {p.pass_pct_ge_20}% AND pct_zero &le; {p.pass_max_pct_zero}%</td></tr>")
-    w(f'<tr><td><span class="badge badge-low">LOW_COVERAGE</span></td>'
-      f"<td>pct_ge_20 &lt; {p.pass_pct_ge_20}% (and not DROP_OUT)</td></tr>")
-    w(f'<tr><td><span class="badge badge-drop">DROP_OUT</span></td>'
-      f"<td>pct_zero &gt; {p.dropout_pct_zero}% OR zero-block &ge; {p.dropout_zero_block_bp} bp</td></tr>")
-    w(f'<tr><td><span class="badge badge-uneven">UNEVEN</span></td>'
-      f"<td>mean_depth &gt; 20 AND CV &gt; {p.uneven_cv}</td></tr>")
-    w(f'<tr><td><span class="badge badge-lexon">LOW_EXON</span></td>'
-      f"<td>(exon mode) any exon pct_ge_20 &lt; {p.exon_pct_ge_20}% or pct_zero &gt; {p.exon_max_pct_zero}%</td></tr>")
+    w(
+        f'<tr><td><span class="badge badge-pass">PASS</span></td>'
+        f"<td>pct_ge_20 &ge; {p.pass_pct_ge_20}% AND pct_zero &le; {p.pass_max_pct_zero}%</td></tr>"
+    )
+    w(
+        f'<tr><td><span class="badge badge-low">LOW_COVERAGE</span></td>'
+        f"<td>pct_ge_20 &lt; {p.pass_pct_ge_20}% (and not DROP_OUT)</td></tr>"
+    )
+    w(
+        f'<tr><td><span class="badge badge-drop">DROP_OUT</span></td>'
+        f"<td>pct_zero &gt; {p.dropout_pct_zero}% OR zero-block &ge; {p.dropout_zero_block_bp} bp</td></tr>"
+    )
+    w(
+        f'<tr><td><span class="badge badge-uneven">UNEVEN</span></td>'
+        f"<td>mean_depth &gt; 20 AND CV &gt; {p.uneven_cv}</td></tr>"
+    )
+    w(
+        f'<tr><td><span class="badge badge-lexon">LOW_EXON</span></td>'
+        f"<td>(exon mode) any exon pct_ge_20 &lt; {p.exon_pct_ge_20}% or pct_zero &gt; {p.exon_max_pct_zero}%</td></tr>"
+    )
     w("</tbody></table>")
     w("</div>")
     w("<p>Evaluation order: DROP_OUT &rarr; UNEVEN &rarr; LOW_EXON &rarr; LOW_COVERAGE &rarr; PASS.</p>")
@@ -418,14 +455,26 @@ def _build_html(ctx: ReportContext) -> str:
     glossary = [
         ("PASS", "Coverage is adequate. &ge;95% of bases have &ge;20x depth."),
         ("LOW_COVERAGE", "Insufficient depth. &lt;95% of bases reach 20x."),
-        ("DROP_OUT", "Complete loss of coverage in significant portions (&gt;5% zero-depth or &ge;500bp zero block)."),
-        ("UNEVEN", "High mean depth but highly variable (CV &gt;1.0). May indicate amplification bias."),
+        (
+            "DROP_OUT",
+            "Complete loss of coverage in significant portions (&gt;5% zero-depth or &ge;500bp zero block).",
+        ),
+        (
+            "UNEVEN",
+            "High mean depth but highly variable (CV &gt;1.0). May indicate amplification bias.",
+        ),
         ("LOW_EXON", "One or more individual exons have critically low coverage."),
         ("Mean Depth", "Average number of reads covering each base position."),
         ("Median Depth", "Middle value of per-base depths (more robust than mean)."),
-        ("%&ge;20x", "Percentage of bases covered by at least 20 reads (clinical adequacy threshold)."),
+        (
+            "%&ge;20x",
+            "Percentage of bases covered by at least 20 reads (clinical adequacy threshold).",
+        ),
         ("%Zero", "Percentage of bases with no coverage at all."),
-        ("CV (Coefficient of Variation)", "Standard deviation divided by mean. Higher = more uneven."),
+        (
+            "CV (Coefficient of Variation)",
+            "Standard deviation divided by mean. Higher = more uneven.",
+        ),
     ]
     for term, defn in glossary:
         w(f"<dt>{term}</dt>")
@@ -459,13 +508,15 @@ def _build_html(ctx: ReportContext) -> str:
 
 def _summary_card(w, title: str, value: str, color: str) -> None:
     long_cls = " sc-value-long" if len(value) > 6 else ""
-    w(f'<div class="summary-card sc-{color}">'
-      f'<div class="sc-value{long_cls}">{value}</div>'
-      f'<div class="sc-title">{title}</div></div>')
+    w(
+        f'<div class="summary-card sc-{color}">'
+        f'<div class="sc-value{long_cls}">{value}</div>'
+        f'<div class="sc-title">{title}</div></div>'
+    )
 
 
 def _metric_row(w, label: str, value: str) -> None:
-    w(f"<tr><td class=\"metric-label\">{label}</td><td class=\"metric-value\">{value}</td></tr>")
+    w(f'<tr><td class="metric-label">{label}</td><td class="metric-value">{value}</td></tr>')
 
 
 # ---------------------------------------------------------------------------

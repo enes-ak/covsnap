@@ -9,14 +9,13 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from covsnap import ANNOTATION_VERSION, BUILD, __version__
+from covsnap import ANNOTATION_VERSION, __version__
 from covsnap.annotation import (
     detect_contig_style,
     get_sample_name,
@@ -40,7 +39,6 @@ from covsnap.report import (
 )
 
 logger = logging.getLogger("covsnap")
-
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +140,8 @@ def build_parser() -> argparse.ArgumentParser:
     # ── Output options ──
     out = parser.add_argument_group("Output options")
     out.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         metavar="FILE",
         default="covsnap.report.html",
         help="HTML report output path (default: covsnap.report.html).",
@@ -212,23 +211,48 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── Classification tuning ──
     cl = parser.add_argument_group("Classification tuning")
-    cl.add_argument("--pass-pct-ge-20", type=float, default=95.0,
-                    help="Minimum pct_ge_20 for PASS (default: 95.0).")
-    cl.add_argument("--pass-max-pct-zero", type=float, default=1.0,
-                    help="Maximum pct_zero for PASS (default: 1.0).")
-    cl.add_argument("--dropout-pct-zero", type=float, default=5.0,
-                    help="pct_zero above which DROP_OUT is called (default: 5.0).")
-    cl.add_argument("--uneven-cv", type=float, default=1.0,
-                    help="CV above which UNEVEN is called (default: 1.0).")
-    cl.add_argument("--exon-pct-ge-20", type=float, default=90.0,
-                    help="Minimum exon pct_ge_20 for LOW_EXON (default: 90.0).")
-    cl.add_argument("--exon-max-pct-zero", type=float, default=5.0,
-                    help="Maximum exon pct_zero for LOW_EXON (default: 5.0).")
+    cl.add_argument(
+        "--pass-pct-ge-20",
+        type=float,
+        default=95.0,
+        help="Minimum pct_ge_20 for PASS (default: 95.0).",
+    )
+    cl.add_argument(
+        "--pass-max-pct-zero",
+        type=float,
+        default=1.0,
+        help="Maximum pct_zero for PASS (default: 1.0).",
+    )
+    cl.add_argument(
+        "--dropout-pct-zero",
+        type=float,
+        default=5.0,
+        help="pct_zero above which DROP_OUT is called (default: 5.0).",
+    )
+    cl.add_argument(
+        "--uneven-cv",
+        type=float,
+        default=1.0,
+        help="CV above which UNEVEN is called (default: 1.0).",
+    )
+    cl.add_argument(
+        "--exon-pct-ge-20",
+        type=float,
+        default=90.0,
+        help="Minimum exon pct_ge_20 for LOW_EXON (default: 90.0).",
+    )
+    cl.add_argument(
+        "--exon-max-pct-zero",
+        type=float,
+        default=5.0,
+        help="Maximum exon pct_zero for LOW_EXON (default: 5.0).",
+    )
 
     # ── General ──
     gen = parser.add_argument_group("General")
     gen.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="count",
         default=0,
         help="Increase logging verbosity (can repeat: -vv).",
@@ -299,7 +323,10 @@ def _validate_args(args: argparse.Namespace) -> None:
 
     # Exons mode requires gene target (not region or bed)
     if args.exons and args.bed is not None:
-        _error("--exons is only supported in gene mode (positional gene target), not with --bed.", code=1)
+        _error(
+            "--exons is only supported in gene mode (positional gene target), not with --bed.",
+            code=1,
+        )
 
     if args.exon_only and args.bed is not None:
         _error("--exon-only is only supported in gene mode, not with --bed.", code=1)
@@ -323,18 +350,21 @@ def _get_engine_version(engine: str) -> str:
     try:
         if engine == "pysam":
             import pysam
+
             return pysam.__version__
         elif engine == "mosdepth":
             proc = subprocess.run(
                 ["mosdepth", "--version"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             # mosdepth outputs: "mosdepth X.Y.Z"
             return proc.stdout.strip().split()[-1] if proc.stdout.strip() else ""
         elif engine == "samtools":
             proc = subprocess.run(
                 ["samtools", "--version"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             # First line: "samtools X.Y"
             first_line = proc.stdout.strip().split("\n")[0] if proc.stdout.strip() else ""
@@ -388,6 +418,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         return
     if argv is None:
         import sys as _sys
+
         if len(_sys.argv) == 1:
             _run_interactive()
             return
@@ -508,12 +539,14 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                 resolved = gene_info["gene_name"]
                 gene_names_resolved.append(resolved)
                 bam_contig = translate_contig(gene_info["contig"], contig_style)
-                regions.append((
-                    bam_contig,
-                    gene_info["start"],
-                    gene_info["end"],
-                    resolved,
-                ))
+                regions.append(
+                    (
+                        bam_contig,
+                        gene_info["start"],
+                        gene_info["end"],
+                        resolved,
+                    )
+                )
 
     if not regions:
         _error("No target regions resolved. Nothing to do.", code=1)
@@ -528,11 +561,21 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         # that will be replaced by exon-merged results below.
         results = [
             TargetResult(
-                target_id=name, contig=contig, start=start, end=end,
-                length_bp=end - start, mean_depth=0, median_depth=0,
-                min_depth=0, max_depth=0, stdev_depth=0, pct_zero=0,
+                target_id=name,
+                contig=contig,
+                start=start,
+                end=end,
+                length_bp=end - start,
+                mean_depth=0,
+                median_depth=0,
+                min_depth=0,
+                max_depth=0,
+                stdev_depth=0,
+                pct_zero=0,
                 pct_thresholds={t: 0 for t in thresholds},
-                n_lowcov_blocks=0, lowcov_total_bp=0, lowcov_blocks=[],
+                n_lowcov_blocks=0,
+                lowcov_total_bp=0,
+                lowcov_blocks=[],
             )
             for contig, start, end, name in regions
         ]
@@ -599,11 +642,14 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                 for gname, exon_regs, exon_recs in exon_jobs:
                     try:
                         exon_depth_results = compute_depth(
-                            bam_path=args.alignment, regions=exon_regs,
-                            engine=engine, thresholds=thresholds,
+                            bam_path=args.alignment,
+                            regions=exon_regs,
+                            engine=engine,
+                            thresholds=thresholds,
                             lowcov_threshold=args.lowcov_threshold,
                             lowcov_min_len=args.lowcov_min_len,
-                            threads=args.threads, reference=args.reference,
+                            threads=args.threads,
+                            reference=args.reference,
                         )
                         for er in exon_depth_results:
                             er.engine_used = engine
@@ -621,11 +667,14 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                     for gname, exon_regs, exon_recs in exon_jobs:
                         future = pool.submit(
                             compute_depth,
-                            bam_path=args.alignment, regions=exon_regs,
-                            engine=engine, thresholds=thresholds,
+                            bam_path=args.alignment,
+                            regions=exon_regs,
+                            engine=engine,
+                            thresholds=thresholds,
                             lowcov_threshold=args.lowcov_threshold,
                             lowcov_min_len=args.lowcov_min_len,
-                            threads=1, reference=args.reference,
+                            threads=1,
+                            reference=args.reference,
                         )
                         futures[future] = (gname, exon_recs)
 
@@ -649,7 +698,11 @@ def _run_pipeline(args: argparse.Namespace) -> None:
             for i, (contig, start, end, name) in enumerate(regions):
                 if name in exon_results_map:
                     merged = merge_exon_results(
-                        exon_results_map[name], name, contig, start, end,
+                        exon_results_map[name],
+                        name,
+                        contig,
+                        start,
+                        end,
                     )
                     merged.engine_used = engine
                     merged.bam_path = args.alignment
@@ -657,7 +710,9 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                     results[i] = merged
                     logger.info(
                         "%s: exon-only metrics — %d exonic bp (was %d gene bp)",
-                        name, merged.length_bp, end - start,
+                        name,
+                        merged.length_bp,
+                        end - start,
                     )
                 elif skip_full_gene:
                     fallback_regions.append((i, contig, start, end, name))
@@ -667,11 +722,14 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                 fb_regions = [(c, s, e, n) for _, c, s, e, n in fallback_regions]
                 try:
                     fb_results = compute_depth(
-                        bam_path=args.alignment, regions=fb_regions,
-                        engine=engine, thresholds=thresholds,
+                        bam_path=args.alignment,
+                        regions=fb_regions,
+                        engine=engine,
+                        thresholds=thresholds,
                         lowcov_threshold=args.lowcov_threshold,
                         lowcov_min_len=args.lowcov_min_len,
-                        threads=args.threads, reference=args.reference,
+                        threads=args.threads,
+                        reference=args.reference,
                     )
                     for (orig_i, _, _, _, _), fb_r in zip(fallback_regions, fb_results):
                         fb_r.engine_used = engine
@@ -689,8 +747,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
     gene_results_list: Optional[list[TargetResult]] = None
     gene_metadata_list: Optional[list[dict[str, Any]]] = None
 
-    is_region_mode = (args.target is not None and is_region_string(args.target)
-                      and not gene_names_resolved)
+    is_region_mode = args.target is not None and is_region_string(args.target) and not gene_names_resolved
 
     if is_region_mode and len(regions) == 1:
         reg_contig, reg_start, reg_end, _ = regions[0]
@@ -749,11 +806,14 @@ def _run_pipeline(args: argparse.Namespace) -> None:
                         e_start = max(e["start"], reg_start)
                         e_end = min(e["end"], reg_end)
                         if e_start < e_end:
-                            clipped_exon_regions.append((
-                                translate_contig(e["contig"], contig_style),
-                                e_start, e_end,
-                                e.get("exon_id", f"exon_{e['exon_number']}"),
-                            ))
+                            clipped_exon_regions.append(
+                                (
+                                    translate_contig(e["contig"], contig_style),
+                                    e_start,
+                                    e_end,
+                                    e.get("exon_id", f"exon_{e['exon_number']}"),
+                                )
+                            )
                             clipped_exon_records.append(e)
                     if clipped_exon_regions:
                         exon_jobs.append((gname, clipped_exon_regions, clipped_exon_records))
@@ -826,7 +886,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         lowcov_threshold=args.lowcov_threshold,
         lowcov_min_len=args.lowcov_min_len,
         emit_lowcov=args.emit_lowcov,
-        exon_only=getattr(args, 'exon_only', False),
+        exon_only=getattr(args, "exon_only", False),
         thresholds=thresholds,
         run_date=run_date,
         gene_results=gene_results_list,
@@ -840,8 +900,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         n_pass = sum(1 for r in results if r.coverage_status == "PASS")
         n_total = len(results)
         print(
-            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. "
-            f"Report: {args.output}",
+            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. Report: {args.output}",
             file=sys.stderr,
         )
 

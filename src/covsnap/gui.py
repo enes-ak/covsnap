@@ -91,7 +91,9 @@ class CovSnapGUI:
         """Set window icon from the bundled logo."""
         try:
             logo_path = os.path.join(
-                os.path.dirname(__file__), "data", "covsnap_logo.png",
+                os.path.dirname(__file__),
+                "data",
+                "covsnap_logo.png",
             )
             if os.path.exists(logo_path):
                 icon = tk.PhotoImage(file=logo_path)
@@ -134,9 +136,18 @@ class CovSnapGUI:
         ttk.Label(root, text="Analysis mode:").grid(row=row, column=0, sticky="e", **pad)
         mode_frame = ttk.Frame(root)
         mode_frame.grid(row=row, column=1, sticky="w", **pad)
-        for text, val in [("Gene symbol", "gene"), ("Genomic region", "region"), ("BED file", "bed")]:
-            ttk.Radiobutton(mode_frame, text=text, variable=self.mode_var, value=val,
-                            command=self._on_mode_change).pack(side="left", padx=(0, 12))
+        for text, val in [
+            ("Gene symbol", "gene"),
+            ("Genomic region", "region"),
+            ("BED file", "bed"),
+        ]:
+            ttk.Radiobutton(
+                mode_frame,
+                text=text,
+                variable=self.mode_var,
+                value=val,
+                command=self._on_mode_change,
+            ).pack(side="left", padx=(0, 12))
 
         # ── Target (gene / region) ──
         row = 7
@@ -158,13 +169,13 @@ class CovSnapGUI:
 
         # ── Exons checkboxes ──
         row = 10
-        self.exons_check = ttk.Checkbutton(root, text="Show exon-level detail",
-                                            variable=self.exons_var)
+        self.exons_check = ttk.Checkbutton(root, text="Show exon-level detail", variable=self.exons_var)
         self.exons_check.grid(row=row, column=1, sticky="w", **pad)
 
         row = 11
         self.exon_only_check = ttk.Checkbutton(
-            root, text="Exon-only metrics (exclude introns)",
+            root,
+            text="Exon-only metrics (exclude introns)",
             variable=self.exon_only_var,
         )
         self.exon_only_check.grid(row=row, column=1, sticky="w", **pad)
@@ -175,9 +186,13 @@ class CovSnapGUI:
         # ── Engine ──
         row = 13
         ttk.Label(root, text="Engine:").grid(row=row, column=0, sticky="e", **pad)
-        engine_combo = ttk.Combobox(root, textvariable=self.engine_var,
-                                     values=["auto", "pysam", "samtools", "mosdepth"],
-                                     state="readonly", width=15)
+        engine_combo = ttk.Combobox(
+            root,
+            textvariable=self.engine_var,
+            values=["auto", "pysam", "samtools", "mosdepth"],
+            state="readonly",
+            width=15,
+        )
         engine_combo.grid(row=row, column=1, sticky="w", **pad)
 
         # ── Output ──
@@ -190,8 +205,9 @@ class CovSnapGUI:
         ttk.Separator(root, orient="horizontal").grid(row=15, column=0, columnspan=3, sticky="ew", pady=8)
 
         self.advanced_open = tk.BooleanVar(master=root, value=False)
-        self.advanced_toggle = ttk.Button(root, text="Advanced Settings (optional) \u25b6",
-                                           command=self._toggle_advanced)
+        self.advanced_toggle = ttk.Button(
+            root, text="Advanced Settings (optional) \u25b6", command=self._toggle_advanced
+        )
         self.advanced_toggle.grid(row=16, column=0, columnspan=3, pady=(0, 4))
 
         self.advanced_frame = ttk.LabelFrame(root, text="Advanced Settings", padding=8)
@@ -216,8 +232,9 @@ class CovSnapGUI:
         pad = dict(padx=6, pady=2)
 
         # Low-coverage
-        ttk.Checkbutton(frame, text="Emit low-coverage blocks",
-                         variable=self.emit_lowcov_var).grid(row=0, column=0, columnspan=2, sticky="w", **pad)
+        ttk.Checkbutton(frame, text="Emit low-coverage blocks", variable=self.emit_lowcov_var).grid(
+            row=0, column=0, columnspan=2, sticky="w", **pad
+        )
 
         ttk.Label(frame, text="Low-cov threshold:").grid(row=1, column=0, sticky="e", **pad)
         ttk.Entry(frame, textvariable=self.lowcov_threshold_var, width=10).grid(row=1, column=1, sticky="w", **pad)
@@ -421,8 +438,7 @@ class CovSnapGUI:
         except SystemExit as exc:
             # _error() prints to stderr then calls sys.exit — capture the
             # last stderr line so the GUI can show the real message.
-            import io, contextlib
-            msg = getattr(exc, '_covsnap_message', None)
+            msg = getattr(exc, "_covsnap_message", None)
             if msg is None:
                 msg = f"Process exited with code {exc.code}. Check terminal for details."
             self.root.after(0, self._on_pipeline_done, None, msg)

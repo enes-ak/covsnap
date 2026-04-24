@@ -16,7 +16,6 @@ from typing import Any, Optional
 
 from covsnap.metrics import TargetResult
 
-
 # ---------------------------------------------------------------------------
 # Classification parameters
 # ---------------------------------------------------------------------------
@@ -170,21 +169,14 @@ def _rationale(r: TargetResult, params: ClassifyParams) -> str:
             f"AND pct_zero ({r.pct_zero:.2f}%) \u2264 {params.pass_max_pct_zero}% \u2192 PASS"
         )
     if status == "LOW_COVERAGE":
-        return (
-            f"pct_ge_20 ({pct_20:.2f}%) < {params.pass_pct_ge_20}% \u2192 LOW_COVERAGE"
-        )
+        return f"pct_ge_20 ({pct_20:.2f}%) < {params.pass_pct_ge_20}% \u2192 LOW_COVERAGE"
     if status == "DROP_OUT":
         if r.pct_zero > params.dropout_pct_zero:
-            return (
-                f"pct_zero ({r.pct_zero:.2f}%) > {params.dropout_pct_zero}% \u2192 DROP_OUT"
-            )
+            return f"pct_zero ({r.pct_zero:.2f}%) > {params.dropout_pct_zero}% \u2192 DROP_OUT"
         return f"Long zero-depth block detected (\u2265 {params.dropout_zero_block_bp} bp) \u2192 DROP_OUT"
     if status == "UNEVEN":
         cv = r.stdev_depth / r.mean_depth if r.mean_depth > 0 else 0
-        return (
-            f"mean_depth ({r.mean_depth:.2f}) > 20 AND "
-            f"CV ({cv:.2f}) > {params.uneven_cv} \u2192 UNEVEN"
-        )
+        return f"mean_depth ({r.mean_depth:.2f}) > 20 AND CV ({cv:.2f}) > {params.uneven_cv} \u2192 UNEVEN"
     if status == "LOW_EXON":
         return "One or more exons below threshold \u2192 LOW_EXON"
     return status

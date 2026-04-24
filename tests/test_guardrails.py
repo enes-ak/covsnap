@@ -3,7 +3,6 @@
 import pytest
 
 from covsnap.bed import (
-    BedInterval,
     check_bed_limits,
     enforce_limits,
     stream_bed_intervals,

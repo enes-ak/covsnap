@@ -67,12 +67,16 @@ class TestCLIGeneMode:
 
     def test_gene_mode_produces_html(self, synthetic_bam, tmp_output_dir):
         html_out = str(tmp_output_dir / "report.html")
-        main([
-            synthetic_bam,
-            "BRCA1",
-            "-o", html_out,
-            "--engine", "samtools",
-        ])
+        main(
+            [
+                synthetic_bam,
+                "BRCA1",
+                "-o",
+                html_out,
+                "--engine",
+                "samtools",
+            ]
+        )
         assert os.path.isfile(html_out)
         with open(html_out) as f:
             html = f.read()
@@ -82,12 +86,16 @@ class TestCLIGeneMode:
 
     def test_html_has_required_content(self, synthetic_bam, tmp_output_dir):
         html_out = str(tmp_output_dir / "report.html")
-        main([
-            synthetic_bam,
-            "BRCA1",
-            "-o", html_out,
-            "--engine", "samtools",
-        ])
+        main(
+            [
+                synthetic_bam,
+                "BRCA1",
+                "-o",
+                html_out,
+                "--engine",
+                "samtools",
+            ]
+        )
         with open(html_out) as f:
             html = f.read()
         assert "covsnap" in html.lower()
@@ -99,11 +107,14 @@ class TestCLIGeneMode:
 
     def test_default_output_name(self, synthetic_bam, tmp_output_dir, monkeypatch):
         monkeypatch.chdir(tmp_output_dir)
-        main([
-            synthetic_bam,
-            "BRCA1",
-            "--engine", "samtools",
-        ])
+        main(
+            [
+                synthetic_bam,
+                "BRCA1",
+                "--engine",
+                "samtools",
+            ]
+        )
         assert os.path.isfile(str(tmp_output_dir / "covsnap.report.html"))
 
 
@@ -114,12 +125,16 @@ class TestCLIRegionMode:
 
     def test_region_mode(self, synthetic_bam, tmp_output_dir):
         html_out = str(tmp_output_dir / "report.html")
-        main([
-            synthetic_bam,
-            "chr17:43044295-43125482",
-            "-o", html_out,
-            "--engine", "samtools",
-        ])
+        main(
+            [
+                synthetic_bam,
+                "chr17:43044295-43125482",
+                "-o",
+                html_out,
+                "--engine",
+                "samtools",
+            ]
+        )
         assert os.path.isfile(html_out)
         with open(html_out) as f:
             html = f.read()
@@ -133,12 +148,17 @@ class TestCLIBedMode:
 
     def test_bed_mode(self, synthetic_bam, sample_bed, tmp_output_dir):
         html_out = str(tmp_output_dir / "report.html")
-        main([
-            synthetic_bam,
-            "--bed", sample_bed,
-            "-o", html_out,
-            "--engine", "samtools",
-        ])
+        main(
+            [
+                synthetic_bam,
+                "--bed",
+                sample_bed,
+                "-o",
+                html_out,
+                "--engine",
+                "samtools",
+            ]
+        )
         assert os.path.isfile(html_out)
         with open(html_out) as f:
             html = f.read()
@@ -154,11 +174,14 @@ class TestCLIExonMode:
     def test_exons_with_bed_is_rejected(self, synthetic_bam, sample_bed):
         """--exons is only valid in gene mode, not with --bed."""
         with pytest.raises(SystemExit) as exc_info:
-            main([
-                synthetic_bam,
-                "--bed", sample_bed,
-                "--exons",
-            ])
+            main(
+                [
+                    synthetic_bam,
+                    "--bed",
+                    sample_bed,
+                    "--exons",
+                ]
+            )
         assert exc_info.value.code == 1
 
 
@@ -169,10 +192,15 @@ class TestCLIBedGuardrails:
 
     def test_large_bed_error_mode(self, synthetic_bam, large_bed):
         with pytest.raises(SystemExit) as exc_info:
-            main([
-                synthetic_bam,
-                "--bed", large_bed,
-                "--on-large-bed", "error",
-                "--max-targets", "2000",
-            ])
+            main(
+                [
+                    synthetic_bam,
+                    "--bed",
+                    large_bed,
+                    "--on-large-bed",
+                    "error",
+                    "--max-targets",
+                    "2000",
+                ]
+            )
         assert exc_info.value.code == 4

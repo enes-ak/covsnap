@@ -2,7 +2,7 @@
 
 from covsnap.html_report import write_html_report
 from covsnap.metrics import TargetResult
-from covsnap.report import ClassifyParams, ReportContext
+from covsnap.report import ReportContext
 
 
 def _make_result(**overrides) -> TargetResult:
@@ -94,8 +94,19 @@ class TestHTMLReportBasic:
         path = str(tmp_path / "report.html")
         results = [
             _make_result(target_id="BRCA1", coverage_status="PASS"),
-            _make_result(target_id="TP53", coverage_status="LOW_COVERAGE",
-                         pct_thresholds={1: 99.0, 5: 95.0, 10: 90.0, 20: 80.0, 30: 70.0, 50: 50.0, 100: 10.0}),
+            _make_result(
+                target_id="TP53",
+                coverage_status="LOW_COVERAGE",
+                pct_thresholds={
+                    1: 99.0,
+                    5: 95.0,
+                    10: 90.0,
+                    20: 80.0,
+                    30: 70.0,
+                    50: 50.0,
+                    100: 10.0,
+                },
+            ),
         ]
         ctx = _make_context(results=results)
         write_html_report(path, ctx)

@@ -67,7 +67,12 @@ timeout = 120
 
 [tool.ruff]
 target-version = "py39"
-line-length = 100
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# html_report.py embeds CSS/HTML/JS string literals that would be harder
+# to read if wrapped; the line-length rule is not meaningful for them.
+"src/covsnap/html_report.py" = ["E501"]

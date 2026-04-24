@@ -83,12 +83,9 @@ jobs:
         run: |
           conda install -y conda-build conda-verify
 
-      - name: Build conda package
+      - name: Build and test conda package
         shell: bash -l {0}
         run: |
+          # conda build runs the recipe's test section automatically;
+          # pass --no-anaconda-upload to keep the build local.
           conda build recipes/conda/ --no-anaconda-upload
-
-      - name: Test conda package
-        shell: bash -l {0}
-        run: |
-          conda build recipes/conda/ --test

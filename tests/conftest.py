@@ -94,10 +94,7 @@ def tmp_output_dir(tmp_path):
 def sample_bed(tmp_path):
     """Create a minimal BED file with two BRCA1 sub-regions."""
     bed = tmp_path / "targets.bed"
-    bed.write_text(
-        "chr17\t43044294\t43050000\tregion_1\n"
-        "chr17\t43090000\t43095000\tregion_2\n"
-    )
+    bed.write_text("chr17\t43044294\t43050000\tregion_1\nchr17\t43090000\t43095000\tregion_2\n")
     return str(bed)
 
 

@@ -46,9 +46,7 @@ def select_engine(engine: str) -> str:
     if engine == "mosdepth":
         if shutil.which("mosdepth"):
             return "mosdepth"
-        raise RuntimeError(
-            "mosdepth not found on PATH. Install it or use --engine samtools."
-        )
+        raise RuntimeError("mosdepth not found on PATH. Install it or use --engine samtools.")
 
     if engine == "samtools":
         if shutil.which("samtools"):
@@ -85,10 +83,7 @@ def _make_target_specs(
     regions: list[tuple[str, int, int, str]],
 ) -> list[_TargetSpec]:
     """Convert (contig, start, end, name) tuples to _TargetSpec list."""
-    return [
-        _TargetSpec(target_id=name, contig=contig, start=start, end=end)
-        for contig, start, end, name in regions
-    ]
+    return [_TargetSpec(target_id=name, contig=contig, start=start, end=end) for contig, start, end, name in regions]
 
 
 def _write_tmp_bed(targets: list[_TargetSpec], tmp_dir: str) -> str:
@@ -152,18 +147,34 @@ def compute_depth(
     try:
         if engine == "pysam":
             return _run_pysam(
-                bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
+                bam_path,
+                specs,
+                thresholds,
+                lowcov_threshold,
+                lowcov_min_len,
                 reference,
             )
         elif engine == "samtools":
             return _run_samtools_parallel(
-                bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
-                threads, tmp_dir, reference,
+                bam_path,
+                specs,
+                thresholds,
+                lowcov_threshold,
+                lowcov_min_len,
+                threads,
+                tmp_dir,
+                reference,
             )
         elif engine == "mosdepth":
             return _run_mosdepth(
-                bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
-                threads, tmp_dir, reference,
+                bam_path,
+                specs,
+                thresholds,
+                lowcov_threshold,
+                lowcov_min_len,
+                threads,
+                tmp_dir,
+                reference,
             )
         else:
             raise ValueError(f"Unknown engine: {engine}")
@@ -209,17 +220,19 @@ def _run_samtools_parallel(
 
     if workers <= 1 or n_targets <= 1:
         return _run_samtools_chunk(
-            bam_path, targets, thresholds, lowcov_threshold, lowcov_min_len,
-            tmp_dir, reference,
+            bam_path,
+            targets,
+            thresholds,
+            lowcov_threshold,
+            lowcov_min_len,
+            tmp_dir,
+            reference,
         )
 
     # Split targets into chunks, preserving original indices
     indexed_targets = list(enumerate(targets))
     chunk_size = math.ceil(n_targets / workers)
-    chunks = [
-        indexed_targets[i:i + chunk_size]
-        for i in range(0, n_targets, chunk_size)
-    ]
+    chunks = [indexed_targets[i : i + chunk_size] for i in range(0, n_targets, chunk_size)]
 
     logger.info("Parallel samtools: %d chunks across %d workers", len(chunks), workers)
 
@@ -233,13 +246,16 @@ def _run_samtools_parallel(
             chunk_tmp = os.path.join(tmp_dir, f"chunk_{ci}")
             os.makedirs(chunk_tmp, exist_ok=True)
             # Serialize specs for subprocess
-            chunk_regions = [
-                (s.contig, s.start, s.end, s.target_id) for s in chunk_specs
-            ]
+            chunk_regions = [(s.contig, s.start, s.end, s.target_id) for s in chunk_specs]
             future = pool.submit(
                 _samtools_chunk_worker,
-                bam_path, chunk_regions, thresholds,
-                lowcov_threshold, lowcov_min_len, chunk_tmp, reference,
+                bam_path,
+                chunk_regions,
+                thresholds,
+                lowcov_threshold,
+                lowcov_min_len,
+                chunk_tmp,
+                reference,
             )
             futures[future] = chunk_indices
 
@@ -264,8 +280,13 @@ def _samtools_chunk_worker(
     """Worker function for parallel samtools execution."""
     specs = _make_target_specs(regions)
     return _run_samtools_chunk(
-        bam_path, specs, thresholds, lowcov_threshold, lowcov_min_len,
-        tmp_dir, reference,
+        bam_path,
+        specs,
+        thresholds,
+        lowcov_threshold,
+        lowcov_min_len,
+        tmp_dir,
+        reference,
     )
 
 
@@ -381,8 +402,10 @@ def _run_mosdepth(
 
     cmd = [
         "mosdepth",
-        "--by", bed_path,
-        "--threads", str(threads),
+        "--by",
+        bed_path,
+        "--threads",
+        str(threads),
         prefix,
         bam_path,
     ]
@@ -396,7 +419,11 @@ def _run_mosdepth(
 
     perbase_file = f"{prefix}.per-base.bed.gz"
     return _stream_mosdepth_perbase(
-        perbase_file, targets, thresholds, lowcov_threshold, lowcov_min_len,
+        perbase_file,
+        targets,
+        thresholds,
+        lowcov_threshold,
+        lowcov_min_len,
     )
 
 
@@ -445,7 +472,7 @@ def _stream_mosdepth_perbase(
             block_start = int(parts[1])
             block_end = int(parts[2])
             depth = int(float(parts[3]))
-            block_count = block_end - block_start
+            block_end - block_start
 
             # Find overlapping targets
             while cursor < n_targets:
@@ -513,13 +540,14 @@ def _run_pysam(
         for t in targets:
             try:
                 cov = af.count_coverage(
-                    t.contig, t.start, t.end,
-                    quality_threshold=0, read_callback="all",
+                    t.contig,
+                    t.start,
+                    t.end,
+                    quality_threshold=0,
+                    read_callback="all",
                 )
             except ValueError as exc:
-                raise RuntimeError(
-                    f"pysam count_coverage failed for {t.contig}:{t.start}-{t.end}: {exc}"
-                ) from exc
+                raise RuntimeError(f"pysam count_coverage failed for {t.contig}:{t.start}-{t.end}: {exc}") from exc
 
             depths = (
                 np.array(cov[0], dtype=np.int32)
@@ -551,28 +579,33 @@ def _run_pysam(
 
             # Low-coverage blocks
             lowcov_blocks = _detect_lowcov_blocks(
-                depths, t.start, lowcov_threshold, lowcov_min_len,
+                depths,
+                t.start,
+                lowcov_threshold,
+                lowcov_min_len,
             )
             lowcov_total_bp = sum(b.length for b in lowcov_blocks)
 
-            results.append(TargetResult(
-                target_id=t.target_id,
-                contig=t.contig,
-                start=t.start,
-                end=t.end,
-                length_bp=length,
-                mean_depth=round(mean_depth, 2),
-                median_depth=round(median_depth, 1),
-                min_depth=min_depth,
-                max_depth=max_depth,
-                stdev_depth=round(stdev_depth, 2),
-                pct_zero=round(pct_zero, 2),
-                pct_thresholds=pct_thresholds,
-                n_lowcov_blocks=len(lowcov_blocks),
-                lowcov_total_bp=lowcov_total_bp,
-                lowcov_blocks=lowcov_blocks,
-                histogram=histogram,
-            ))
+            results.append(
+                TargetResult(
+                    target_id=t.target_id,
+                    contig=t.contig,
+                    start=t.start,
+                    end=t.end,
+                    length_bp=length,
+                    mean_depth=round(mean_depth, 2),
+                    median_depth=round(median_depth, 1),
+                    min_depth=min_depth,
+                    max_depth=max_depth,
+                    stdev_depth=round(stdev_depth, 2),
+                    pct_zero=round(pct_zero, 2),
+                    pct_thresholds=pct_thresholds,
+                    n_lowcov_blocks=len(lowcov_blocks),
+                    lowcov_total_bp=lowcov_total_bp,
+                    lowcov_blocks=lowcov_blocks,
+                    histogram=histogram,
+                )
+            )
     finally:
         af.close()
 
@@ -582,11 +615,21 @@ def _run_pysam(
 def _empty_result(t: _TargetSpec, thresholds: list[int]) -> TargetResult:
     """Return a zero-filled TargetResult for an empty region."""
     return TargetResult(
-        target_id=t.target_id, contig=t.contig, start=t.start, end=t.end,
-        length_bp=0, mean_depth=0, median_depth=0, min_depth=0, max_depth=0,
-        stdev_depth=0, pct_zero=0,
+        target_id=t.target_id,
+        contig=t.contig,
+        start=t.start,
+        end=t.end,
+        length_bp=0,
+        mean_depth=0,
+        median_depth=0,
+        min_depth=0,
+        max_depth=0,
+        stdev_depth=0,
+        pct_zero=0,
         pct_thresholds={th: 0.0 for th in thresholds},
-        n_lowcov_blocks=0, lowcov_total_bp=0, lowcov_blocks=[],
+        n_lowcov_blocks=0,
+        lowcov_total_bp=0,
+        lowcov_blocks=[],
     )
 
 
@@ -614,12 +657,14 @@ def _detect_lowcov_blocks(
         block_len = e - s
         if block_len >= lowcov_min_len:
             block_depths = depths[s:e]
-            blocks.append(LowCovBlock(
-                start=region_start + int(s),
-                end=region_start + int(e),
-                depth_sum=int(block_depths.sum()),
-                length=block_len,
-            ))
+            blocks.append(
+                LowCovBlock(
+                    start=region_start + int(s),
+                    end=region_start + int(e),
+                    depth_sum=int(block_depths.sum()),
+                    length=block_len,
+                )
+            )
     return blocks
 
 
@@ -646,9 +691,7 @@ def ensure_index(bam_path: str, no_index: bool = False) -> None:
         )
 
     if not shutil.which("samtools"):
-        raise RuntimeError(
-            f"Index not found for '{bam_path}' and samtools is not on PATH to create one."
-        )
+        raise RuntimeError(f"Index not found for '{bam_path}' and samtools is not on PATH to create one.")
 
     logger.info("Creating index for %s ...", bam_path)
     proc = subprocess.run(

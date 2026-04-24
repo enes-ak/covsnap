@@ -1,7 +1,5 @@
 """Tests for classification logic and report generation."""
 
-import os
-
 from covsnap.metrics import LowCovBlock, TargetResult
 from covsnap.report import ClassifyParams, classify_target
 

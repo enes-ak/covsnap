@@ -1,13 +1,11 @@
 """Tests for covsnap GUI module."""
 
-import argparse
 import os
 from unittest.mock import patch
 
 import pytest
 
 from covsnap.gui import _DEFAULTS
-
 
 # Skip all Tk-dependent tests when no display is available
 _has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
@@ -18,10 +16,23 @@ class TestDefaults:
 
     def test_defaults_has_required_keys(self):
         required = [
-            "bed", "exons", "reference", "no_index", "engine", "output",
-            "threads", "emit_lowcov", "lowcov_threshold", "lowcov_min_len",
-            "pct_thresholds", "pass_pct_ge_20", "pass_max_pct_zero",
-            "dropout_pct_zero", "uneven_cv", "verbose", "quiet",
+            "bed",
+            "exons",
+            "reference",
+            "no_index",
+            "engine",
+            "output",
+            "threads",
+            "emit_lowcov",
+            "lowcov_threshold",
+            "lowcov_min_len",
+            "pct_thresholds",
+            "pass_pct_ge_20",
+            "pass_max_pct_zero",
+            "dropout_pct_zero",
+            "uneven_cv",
+            "verbose",
+            "quiet",
         ]
         for key in required:
             assert key in _DEFAULTS, f"Missing default: {key}"
@@ -39,12 +50,14 @@ class TestGUIWithDisplay:
 
     def test_gui_creates_and_cancels(self):
         from covsnap.gui import CovSnapGUI
+
         gui = CovSnapGUI()
         gui._on_cancel()
         assert gui.result is None
 
     def test_run_gene_mode(self):
         from covsnap.gui import CovSnapGUI
+
         gui = CovSnapGUI()
         gui.alignment_var.set("/data/sample.bam")
         gui.mode_var.set("gene")
@@ -57,6 +70,7 @@ class TestGUIWithDisplay:
 
     def test_run_bed_mode(self):
         from covsnap.gui import CovSnapGUI
+
         gui = CovSnapGUI()
         gui.alignment_var.set("/data/sample.bam")
         gui.mode_var.set("bed")
@@ -68,6 +82,7 @@ class TestGUIWithDisplay:
 
     def test_run_region_mode(self):
         from covsnap.gui import CovSnapGUI
+
         gui = CovSnapGUI()
         gui.alignment_var.set("/data/sample.bam")
         gui.mode_var.set("region")
@@ -79,6 +94,7 @@ class TestGUIWithDisplay:
 
     def test_run_empty_alignment_shows_error(self):
         from covsnap.gui import CovSnapGUI
+
         gui = CovSnapGUI()
         gui.alignment_var.set("")
         with patch("covsnap.gui.messagebox.showerror") as mock_err:
@@ -88,6 +104,7 @@ class TestGUIWithDisplay:
 
     def test_advanced_settings_applied(self):
         from covsnap.gui import CovSnapGUI
+
         gui = CovSnapGUI()
         gui.alignment_var.set("/data/sample.bam")
         gui.mode_var.set("gene")
@@ -104,6 +121,7 @@ class TestCLINoArgsTriggersGUI:
     @patch("covsnap.cli._run_interactive")
     def test_no_args_calls_interactive(self, mock_interactive):
         from covsnap.cli import main
+
         mock_interactive.side_effect = SystemExit(0)
         with pytest.raises(SystemExit) as exc_info:
             main([])

@@ -1,6 +1,6 @@
 # covsnap — CLI Specification
 
-**Version:** 0.1.0
+**Version:** 0.4.0
 **Build:** hg38-only
 **Annotation:** GENCODE v44 (Ensembl 110), frozen at build time
 **License:** MIT

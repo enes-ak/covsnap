@@ -2,8 +2,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Tool version** | 0.1.0 |
-| **Date** | 2026-02-06 15:00:00 UTC |
+| **Tool version** | 0.4.0 |
+| **Date** | 2026-04-17 15:00:00 UTC |
 | **Engine** | samtools 1.19 |
 | **Annotation** | GENCODE v44 (hg38) |
 | **Input BAM** | `/data/wgs_sample.bam` |

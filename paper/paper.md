@@ -26,7 +26,7 @@ Targeted sequencing panels are widely used in clinical diagnostics and research 
 
 # Statement of need
 
-Coverage QC for targeted panels typically involves combining `samtools depth` or `mosdepth` [@Pedersen2018] with ad hoc scripts to aggregate per-base depth into per-target statistics, compute coverage breadth at clinically relevant thresholds (e.g., percentage of bases with depth $\geq$ 20x), and flag problematic targets. This multi-step process is error-prone, difficult to standardize, and inaccessible to laboratory personnel without bioinformatics training.
+Coverage QC for targeted panels typically involves combining `samtools depth` [@Danecek2021] or `mosdepth` [@Pedersen2018] with ad hoc scripts to aggregate per-base depth into per-target statistics, compute coverage breadth at clinically relevant thresholds (e.g., percentage of bases with depth $\geq$ 20x), and flag problematic targets. This multi-step process is error-prone, difficult to standardize, and inaccessible to laboratory personnel without bioinformatics training.
 
 covsnap addresses these issues by providing gene-aware analysis without external annotation files, automated classification heuristics with tunable thresholds, interactive HTML reports suitable for direct review or LIMS archival, and a cross-platform graphical interface for users without command-line experience. The target audience includes clinical laboratory scientists validating panel runs, bioinformaticians building sequencing QC pipelines, and researchers performing targeted resequencing studies.
 
@@ -50,7 +50,7 @@ covsnap's architecture is organized around four loosely coupled concerns, each i
 
 **Annotation** (`annotation.py`). A bundled gene dictionary of approximately 60 clinically relevant genes enables immediate use. An optional full GENCODE v44 tabix index extends coverage to 62,700+ genes and 201,000+ MANE Select exons. Gene alias resolution (e.g., HER2 $\rightarrow$ ERBB2) and fuzzy matching for typos are included. Contig naming style (UCSC `chr`-prefixed vs. Ensembl numeric) is auto-detected from BAM headers.
 
-**Depth computation** (`engines.py`). covsnap delegates per-base depth calculation to `mosdepth` (preferred) or `samtools depth`, selected automatically or by the user. Depth streams are consumed in a single pass using Welford's online algorithm [@Welford1962] for mean and variance and a histogram-based exact median, achieving O(1) memory per target regardless of region size. This streaming design was chosen over in-memory depth arrays to support large panels without excessive memory consumption. Multi-target and multi-gene analyses run in parallel using Python's `ThreadPoolExecutor`.
+**Depth computation** (`engines.py`). covsnap supports three interchangeable depth engines: an in-process `pysam` [@pysam] engine (default, no subprocess overhead), `mosdepth` [@Pedersen2018], and `samtools depth` [@Danecek2021]. The engine is selected automatically based on availability or explicitly via `--engine`. Regardless of backend, depth streams are consumed in a single pass using Welford's online algorithm [@Welford1962] for mean and variance and a histogram-based exact median, achieving O(1) memory per target regardless of region size. This streaming design was chosen over in-memory depth arrays to support large panels without excessive memory consumption. Multi-target and multi-gene analyses run in parallel using Python's `ThreadPoolExecutor`.
 
 **Classification** (`report.py`). Ordered heuristics assign each target a status (PASS, DROP_OUT, UNEVEN, LOW_EXON, or LOW_COVERAGE) based on coverage breadth ($\%\geq$20x), zero-coverage fraction, coefficient of variation, and per-exon metrics. All thresholds are user-configurable via CLI flags, enabling adaptation to different laboratory protocols and quality standards.
 
@@ -58,15 +58,33 @@ covsnap's architecture is organized around four loosely coupled concerns, each i
 
 **BED guardrails** (`bed.py`) prevent accidental whole-exome or whole-genome analysis by enforcing configurable limits on target count, total bases, and file size, with options to clip or sample when limits are exceeded.
 
-The tool is packaged with `setuptools`, distributed via PyPI and Bioconda, and registered on bio.tools. A comprehensive test suite of 101 tests uses synthetic BAM files generated with pysam, requiring no real sequencing data.
+The tool is packaged with `setuptools`, distributed via PyPI and Bioconda, and registered on bio.tools. A comprehensive test suite of 103 tests uses synthetic BAM files generated with `pysam` [@pysam], requiring no real sequencing data.
 
-# Research impact statement
+# Example usage
 
-covsnap was developed to address a recurring need encountered during targeted sequencing QC in both clinical and research settings. Since its initial release in February 2026, it has been downloaded over 85 times from Bioconda and over 100 times from PyPI (as of April 2026). The tool is registered on bio.tools (https://bio.tools/covsnap), indexed in Bioconda, and available on PyPI, making it discoverable through standard bioinformatics package channels. Its single-command design and built-in gene index lower the barrier to adoption for laboratories that lack dedicated bioinformatics support, and its interactive HTML reports provide an auditable QC artifact suitable for clinical sequencing workflows.
+A minimal invocation analyzes a single gene in an indexed BAM file:
+
+```bash
+covsnap sample.bam BRCA1 -o brca1.report.html
+```
+
+Multiple genes, exon-level resolution, and exon-only mode (excluding introns, useful for targeted and exome panels) are combined with flags:
+
+```bash
+covsnap sample.bam BRCA1,TP53,ETFDH --exons --exon-only
+```
+
+The tool accepts genomic region strings (e.g. `chr17:43044295-43125482`) and BED files (`--bed targets.bed`) as alternative target specifications. Running `covsnap` with no arguments launches the graphical interface. The output is a single self-contained HTML file containing summary cards, per-exon coverage bar charts, and a glossary of metrics and classification terms (Figure 1).
+
+![covsnap HTML report showing summary cards, per-exon coverage bar chart with depth-based color gradient, and PASS/FAIL classification for a multi-gene run.\label{fig:report}](../docs/screenshots/html-report-full.png){ width=90% }
+
+# Adoption and availability
+
+covsnap is distributed through channels that the bioinformatics community routinely uses: PyPI, Bioconda, BioContainers (Docker/Singularity images built automatically from the Bioconda recipe), and a versioned Zenodo archive with a persistent DOI. It is indexed on bio.tools (<https://bio.tools/covsnap>), which makes it discoverable through standard tool registries. Since the initial release in February 2026, the package has been installed several hundred times across Bioconda and PyPI. The single-command design and bundled gene index lower the barrier to adoption for laboratories without dedicated bioinformatics support, while the self-contained HTML report provides an auditable QC artifact suitable for clinical sequencing workflows.
 
 # AI usage disclosure
 
-Generative AI tools (Claude, Anthropic) were used during the development of covsnap to assist with code implementation, test writing, and documentation drafting, including this manuscript. All AI-generated code was reviewed, tested (101 automated tests), and validated by the author. The software architecture, design decisions, and scientific content were directed by the author.
+Generative AI tools (Claude, Anthropic) were used during the development of covsnap to assist with code implementation, test writing, and documentation drafting, including this manuscript. All AI-generated code was reviewed, tested (103 automated tests), and validated by the author. The software architecture, design decisions, and scientific content were directed by the author.
 
 # Acknowledgements
 

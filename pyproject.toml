@@ -10,14 +10,15 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [
-    {name = "covsnap developers"},
+    {name = "Enes Ak"},
 ]
 keywords = ["bioinformatics", "coverage", "sequencing", "quality-control", "hg38"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",

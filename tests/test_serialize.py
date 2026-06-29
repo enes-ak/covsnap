@@ -7,6 +7,7 @@ from covsnap.report import ClassifyParams, ReportContext
 from covsnap.serialize import (
     report_to_dict,
     write_json_report,
+    write_tsv_report,
 )
 
 
@@ -132,3 +133,43 @@ class TestJsonWriter:
             loaded = json.load(f)
         assert loaded["run"]["sample_name"] == "SAMPLE_01"
         assert loaded["targets"][0]["target_id"] == "BRCA1"
+
+
+class TestTsvWriter:
+    def _read(self, path):
+        with open(path) as f:
+            return [line.rstrip("\n").split("\t") for line in f]
+
+    def test_header_and_row_count(self, tmp_path):
+        from covsnap.serialize import write_tsv_report
+        results = [_make_result(), _make_result(target_id="TP53")]
+        path = str(tmp_path / "out.tsv")
+        write_tsv_report(path, _make_context(results=results))
+        rows = self._read(path)
+        assert len(rows) == 3  # header + 2 targets
+        assert rows[0][0] == "sample_name"
+        assert rows[0][1] == "target_id"
+
+    def test_threshold_columns_present(self, tmp_path):
+        from covsnap.serialize import write_tsv_report
+        path = str(tmp_path / "out.tsv")
+        write_tsv_report(path, _make_context())
+        header = self._read(path)[0]
+        assert "pct_ge_20" in header
+        assert "pct_ge_100" in header
+        # ascending order of thresholds
+        assert header.index("pct_ge_1") < header.index("pct_ge_20")
+
+    def test_row_values(self, tmp_path):
+        from covsnap.serialize import write_tsv_report
+        path = str(tmp_path / "out.tsv")
+        write_tsv_report(path, _make_context())
+        rows = self._read(path)
+        header, row = rows[0], rows[1]
+        rec = dict(zip(header, row))
+        assert rec["sample_name"] == "SAMPLE_01"
+        assert rec["target_id"] == "BRCA1"
+        assert rec["pct_ge_20"] == "98.6"
+        assert rec["coverage_status"] == "PASS"
+        # constant column count across all rows
+        assert all(len(r) == len(header) for r in rows)

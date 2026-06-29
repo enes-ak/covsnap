@@ -151,7 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         metavar="FILE",
         default="covsnap.report.html",
-        help="HTML report output path (default: covsnap.report.html).",
+        help="Output path; treated as a stem from which per-format paths are derived (default: covsnap.report.html).",
     )
     out.add_argument(
         "--format",

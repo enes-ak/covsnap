@@ -147,6 +147,32 @@ covsnap sample.bam BRCA1 --exon-only --exons   # same + show exon details in rep
 | | x | exonic regions only | no |
 | x | x | exonic regions only | yes |
 
+### Machine-readable output & MultiQC
+
+covsnap can emit structured outputs for pipelines and aggregation, selected via
+`--format` (comma-separated; default `html`):
+
+```bash
+# HTML + JSON + TSV + a MultiQC-ready file
+covsnap sample.bam BRCA1,TP53 --format html,json,tsv,multiqc -o covsnap.report.html
+```
+
+Output paths are derived from `-o`:
+
+| Format | File |
+|---|---|
+| `html` | `covsnap.report.html` |
+| `json` | `covsnap.report.json` (full: run metadata, per-target + per-exon metrics, histograms) |
+| `tsv` | `covsnap.report.tsv` (flat, one row per target) |
+| `multiqc` | `covsnap.report_mqc.json` (auto-detected by MultiQC) |
+
+The `*_mqc.json` file is picked up automatically when you run MultiQC over a
+directory of covsnap outputs, producing a cross-sample coverage QC table:
+
+```bash
+multiqc .
+```
+
 ### Region mode
 
 ```bash
@@ -251,7 +277,7 @@ This creates `hg38_genes.tsv.gz`, `hg38_exons.bed.gz`, and `hg38_gene_aliases.js
 covsnap [-h] [--version] [--bed BED] [--exons] [--exon-only]
         [--reference FASTA] [--no-index]
         [--engine {auto,mosdepth,samtools}] [--threads N]
-        [-o FILE] [--emit-lowcov] [--lowcov-threshold N] [--lowcov-min-len N]
+        [-o FILE] [--format LIST] [--emit-lowcov] [--lowcov-threshold N] [--lowcov-min-len N]
         [--max-targets N] [--max-total-bp N] [--max-bed-bytes BYTES]
         [--on-large-bed {error,warn_and_clip,warn_and_sample}]
         [--large-bed-seed N] [--pct-thresholds LIST]
@@ -279,7 +305,8 @@ covsnap [-h] [--version] [--bed BED] [--exons] [--exon-only]
 | `--reference FASTA` | Reference FASTA for CRAM decoding | -- |
 | `--engine` | Depth engine: `auto`, `mosdepth`, `samtools` | `auto` |
 | `--threads N` | Parallel workers for samtools / threads for mosdepth | 4 |
-| `-o FILE` / `--output FILE` | HTML report output path | `covsnap.report.html` |
+| `-o FILE` / `--output FILE` | Output path; treated as a stem from which per-format paths are derived | `covsnap.report.html` |
+| `--format LIST` | Comma-separated outputs: `html,json,tsv,multiqc` | `html` |
 | `--emit-lowcov` | Include low-coverage blocks in the report | off |
 | `-v` / `--verbose` | Increase verbosity (repeatable) | -- |
 | `--quiet` | Suppress non-error output | off |

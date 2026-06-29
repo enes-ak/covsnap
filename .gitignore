@@ -16,5 +16,8 @@ docs/superpowers/
 covsnap.raw.tsv
 covsnap.report.md
 covsnap.report.html
+covsnap.report.json
+covsnap.report.tsv
+*_mqc.json
 report.html
 *.html

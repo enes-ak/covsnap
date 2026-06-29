@@ -1,3 +1,0 @@
-sample_name	target_id	contig	start	end	length_bp	mean_depth	median_depth	min_depth	max_depth	stdev_depth	pct_zero	pct_ge_1	pct_ge_5	pct_ge_10	pct_ge_20	pct_ge_30	pct_ge_50	pct_ge_100	coverage_status	n_lowcov_blocks	lowcov_total_bp
-olgu1	BRCA1	chr17	43044294	43170245	125951	31.51	32.0	5	45	4.82	0.0	100.0	100.0	99.99	99.89	62.08	0.0	0.0	PASS	0	0
-olgu1	TP53	chr17	7661778	7687538	25760	28.48	28.0	0	41	4.38	0.0	100.0	99.98	99.97	99.67	33.99	0.0	0.0	PASS	0	0

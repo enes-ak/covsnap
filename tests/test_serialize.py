@@ -228,3 +228,52 @@ class TestMultiqcWriter:
         path = str(tmp_path / "out_mqc.json")
         write_multiqc_report(path, _make_context(thresholds=[1, 10, 30]))
         assert "pct_ge_20" not in self._load(path)["data"]["SAMPLE_01"]
+
+
+class TestFormatParsing:
+    def test_default_single(self):
+        from covsnap.serialize import parse_formats
+        assert parse_formats("html") == ["html"]
+
+    def test_multi_and_dedupe(self):
+        from covsnap.serialize import parse_formats
+        assert parse_formats("html, json , json,tsv") == ["html", "json", "tsv"]
+
+    def test_case_insensitive(self):
+        from covsnap.serialize import parse_formats
+        assert parse_formats("JSON,MultiQC") == ["json", "multiqc"]
+
+    def test_invalid_token_raises(self):
+        import pytest
+        from covsnap.serialize import parse_formats
+        with pytest.raises(ValueError):
+            parse_formats("html,pdf")
+
+    def test_empty_raises(self):
+        import pytest
+        from covsnap.serialize import parse_formats
+        with pytest.raises(ValueError):
+            parse_formats("")
+
+
+class TestPathDerivation:
+    def test_strips_html_extension(self):
+        from covsnap.serialize import derive_output_paths
+        paths = derive_output_paths(
+            "covsnap.report.html", ["html", "json", "tsv", "multiqc"]
+        )
+        assert paths["html"] == "covsnap.report.html"
+        assert paths["json"] == "covsnap.report.json"
+        assert paths["tsv"] == "covsnap.report.tsv"
+        assert paths["multiqc"] == "covsnap.report_mqc.json"
+
+    def test_no_html_extension_used_as_stem(self):
+        from covsnap.serialize import derive_output_paths
+        paths = derive_output_paths("myreport", ["html", "multiqc"])
+        assert paths["html"] == "myreport.html"
+        assert paths["multiqc"] == "myreport_mqc.json"
+
+    def test_only_requested_formats(self):
+        from covsnap.serialize import derive_output_paths
+        paths = derive_output_paths("r.html", ["json"])
+        assert paths == {"json": "r.json"}

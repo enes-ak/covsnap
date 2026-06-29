@@ -180,3 +180,43 @@ def write_tsv_report(path: str, ctx: ReportContext) -> None:
             row += [str(r.pct_thresholds.get(t, 0.0)) for t in thresholds]
             row += [r.coverage_status, str(r.n_lowcov_blocks), str(r.lowcov_total_bp)]
             f.write("\t".join(row) + "\n")
+
+
+VALID_FORMATS = ("html", "json", "tsv", "multiqc")
+
+
+def parse_formats(spec: str) -> list[str]:
+    """Parse a comma-separated --format value into an ordered, de-duplicated list."""
+    seen: list[str] = []
+    for tok in spec.split(","):
+        fmt = tok.strip().lower()
+        if not fmt:
+            continue
+        if fmt not in VALID_FORMATS:
+            raise ValueError(
+                f"Invalid output format '{fmt}'. Valid formats: {', '.join(VALID_FORMATS)}."
+            )
+        if fmt not in seen:
+            seen.append(fmt)
+    if not seen:
+        raise ValueError(
+            f"No valid output format specified. Valid formats: {', '.join(VALID_FORMATS)}."
+        )
+    return seen
+
+
+def derive_output_paths(output: str, formats: list[str]) -> dict[str, str]:
+    """Derive per-format output paths from the -o value, treated as a stem.
+
+    A trailing .html/.htm (case-insensitive) is stripped to form the stem.
+    """
+    low = output.lower()
+    if low.endswith(".html"):
+        stem = output[:-5]
+    elif low.endswith(".htm"):
+        stem = output[:-4]
+    else:
+        stem = output
+
+    suffixes = {"html": ".html", "json": ".json", "tsv": ".tsv", "multiqc": "_mqc.json"}
+    return {fmt: stem + suffixes[fmt] for fmt in formats}

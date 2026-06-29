@@ -30,6 +30,13 @@ from covsnap.annotation import (
 from covsnap.bed import enforce_limits
 from covsnap.engines import compute_depth, ensure_index, select_engine
 from covsnap.html_report import write_html_report
+from covsnap.serialize import (
+    derive_output_paths,
+    parse_formats,
+    write_json_report,
+    write_multiqc_report,
+    write_tsv_report,
+)
 from covsnap.metrics import TargetResult, merge_exon_results
 from covsnap.report import (
     ClassifyParams,
@@ -145,6 +152,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         default="covsnap.report.html",
         help="HTML report output path (default: covsnap.report.html).",
+    )
+    out.add_argument(
+        "--format",
+        default="html",
+        metavar="LIST",
+        help="Comma-separated output formats: html, json, tsv, multiqc (default: html).",
     )
 
     # ── Low-coverage options ──
@@ -449,6 +462,12 @@ def main(argv: Optional[list[str]] = None) -> None:
 def _run_pipeline(args: argparse.Namespace) -> None:
     """Execute the coverage pipeline for already-validated args."""
     thresholds: list[int] = args._parsed_thresholds  # type: ignore[attr-defined]
+
+    try:
+        output_formats = parse_formats(getattr(args, "format", "html"))
+    except ValueError as exc:
+        print(f"[covsnap] {exc}", file=sys.stderr)
+        sys.exit(1)
 
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -892,15 +911,27 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         gene_results=gene_results_list,
         gene_metadata=gene_metadata_list,
     )
-    write_html_report(args.output, report_ctx)
-    logger.info("HTML report written to %s", args.output)
+    output_paths = derive_output_paths(args.output, output_formats)
+    writers = {
+        "html": write_html_report,
+        "json": write_json_report,
+        "tsv": write_tsv_report,
+        "multiqc": write_multiqc_report,
+    }
+    written = []
+    for fmt in output_formats:
+        path = output_paths[fmt]
+        writers[fmt](path, report_ctx)
+        logger.info("%s report written to %s", fmt, path)
+        written.append(path)
 
     # ── Summary to stderr ──
     if not args.quiet:
         n_pass = sum(1 for r in results if r.coverage_status == "PASS")
         n_total = len(results)
         print(
-            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. Report: {args.output}",
+            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. "
+            f"Output: {', '.join(written)}",
             file=sys.stderr,
         )
 

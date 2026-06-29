@@ -104,6 +104,7 @@ class TestGUIWithDisplay:
         gui = CovSnapGUI()
         gui.alignment_var.set("/data/sample.bam")
         gui.mode_var.set("region")
+        gui._on_mode_change()  # simulate the radiobutton command (exon detail N/A in region mode)
         gui.target_var.set("chr17:43044295-43125482")
         gui._on_run()
         assert gui.result is not None
@@ -122,6 +123,17 @@ class TestGUIWithDisplay:
         gui._on_run()
         assert gui.result is not None
         assert gui.result.format == "html,json,tsv"
+
+    def test_gene_mode_exons_default_on(self):
+        from covsnap.gui import CovSnapGUI
+
+        gui = CovSnapGUI()
+        gui.alignment_var.set("/data/sample.bam")
+        gui.mode_var.set("gene")
+        gui.target_var.set("BRCA1")
+        gui._on_run()
+        assert gui.result is not None
+        assert gui.result.exons is True
 
     def test_run_default_format_is_html(self):
         from covsnap.gui import CovSnapGUI

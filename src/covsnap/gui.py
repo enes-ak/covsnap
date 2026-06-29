@@ -88,7 +88,7 @@ class CovSnapGUI:
         self.target_var = tk.StringVar(master=r)
         self.bed_var = tk.StringVar(master=r)
         self.reference_var = tk.StringVar(master=r)
-        self.exons_var = tk.BooleanVar(master=r, value=False)
+        self.exons_var = tk.BooleanVar(master=r, value=True)
         self.exon_only_var = tk.BooleanVar(master=r, value=False)
         self.engine_var = tk.StringVar(master=r, value="auto")
         self.output_var = tk.StringVar(master=r, value="covsnap.report.html")

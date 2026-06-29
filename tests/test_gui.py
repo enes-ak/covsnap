@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from covsnap.gui import _DEFAULTS
+from covsnap.gui import _DEFAULTS, _selected_formats
 
 # Skip all Tk-dependent tests when no display is available
 _has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
@@ -22,6 +22,7 @@ class TestDefaults:
             "no_index",
             "engine",
             "output",
+            "format",
             "threads",
             "emit_lowcov",
             "lowcov_threshold",
@@ -40,8 +41,25 @@ class TestDefaults:
     def test_default_values(self):
         assert _DEFAULTS["engine"] == "auto"
         assert _DEFAULTS["output"] == "covsnap.report.html"
+        assert _DEFAULTS["format"] == "html"
         assert _DEFAULTS["threads"] == 4
         assert _DEFAULTS["pass_pct_ge_20"] == 95.0
+
+
+class TestSelectedFormats:
+    """Verify the checkbox-state -> --format string helper (no display needed)."""
+
+    def test_html_only(self):
+        assert _selected_formats(True, False, False, False) == "html"
+
+    def test_all_selected_canonical_order(self):
+        assert _selected_formats(True, True, True, True) == "html,json,tsv,multiqc"
+
+    def test_subset_preserves_canonical_order(self):
+        assert _selected_formats(False, True, True, False) == "json,tsv"
+
+    def test_none_selected_falls_back_to_html(self):
+        assert _selected_formats(False, False, False, False) == "html"
 
 
 @pytest.mark.skipif(not _has_display, reason="No display available")
@@ -91,6 +109,30 @@ class TestGUIWithDisplay:
         assert gui.result is not None
         assert gui.result.target == "chr17:43044295-43125482"
         assert gui.result.exons is False
+
+    def test_run_with_format_selection(self):
+        from covsnap.gui import CovSnapGUI
+
+        gui = CovSnapGUI()
+        gui.alignment_var.set("/data/sample.bam")
+        gui.mode_var.set("gene")
+        gui.target_var.set("BRCA1")
+        gui.format_json_var.set(True)
+        gui.format_tsv_var.set(True)
+        gui._on_run()
+        assert gui.result is not None
+        assert gui.result.format == "html,json,tsv"
+
+    def test_run_default_format_is_html(self):
+        from covsnap.gui import CovSnapGUI
+
+        gui = CovSnapGUI()
+        gui.alignment_var.set("/data/sample.bam")
+        gui.mode_var.set("gene")
+        gui.target_var.set("BRCA1")
+        gui._on_run()
+        assert gui.result is not None
+        assert gui.result.format == "html"
 
     def test_run_empty_alignment_shows_error(self):
         from covsnap.gui import CovSnapGUI

@@ -26,6 +26,7 @@ _DEFAULTS = dict(
     no_index=False,
     engine="auto",
     output="covsnap.report.html",
+    format="html",
     threads=4,
     emit_lowcov=False,
     lowcov_threshold=10,
@@ -45,6 +46,25 @@ _DEFAULTS = dict(
     verbose=0,
     quiet=False,
 )
+
+
+def _selected_formats(html: bool, json: bool, tsv: bool, multiqc: bool) -> str:
+    """Build a covsnap ``--format`` string from GUI checkbox states.
+
+    Formats are returned in canonical order (html, json, tsv, multiqc).
+    Falls back to ``"html"`` if nothing is selected, matching the CLI default.
+    """
+    selected = [
+        name
+        for name, on in (
+            ("html", html),
+            ("json", json),
+            ("tsv", tsv),
+            ("multiqc", multiqc),
+        )
+        if on
+    ]
+    return ",".join(selected) if selected else "html"
 
 
 class CovSnapGUI:
@@ -72,6 +92,10 @@ class CovSnapGUI:
         self.exon_only_var = tk.BooleanVar(master=r, value=False)
         self.engine_var = tk.StringVar(master=r, value="auto")
         self.output_var = tk.StringVar(master=r, value="covsnap.report.html")
+        self.format_html_var = tk.BooleanVar(master=r, value=True)
+        self.format_json_var = tk.BooleanVar(master=r, value=False)
+        self.format_tsv_var = tk.BooleanVar(master=r, value=False)
+        self.format_multiqc_var = tk.BooleanVar(master=r, value=False)
         # Advanced
         self.emit_lowcov_var = tk.BooleanVar(master=r, value=False)
         self.lowcov_threshold_var = tk.StringVar(master=r, value="10")
@@ -201,14 +225,23 @@ class CovSnapGUI:
         ttk.Entry(root, textvariable=self.output_var, width=45).grid(row=row, column=1, **pad)
         ttk.Button(root, text="Browse...", command=self._browse_output).grid(row=row, column=2, **pad)
 
+        # ── Output formats ──
+        ttk.Label(root, text="Output formats:").grid(row=15, column=0, sticky="e", **pad)
+        fmt_frame = ttk.Frame(root)
+        fmt_frame.grid(row=15, column=1, columnspan=2, sticky="w", padx=8)
+        ttk.Checkbutton(fmt_frame, text="HTML", variable=self.format_html_var).pack(side="left", padx=(0, 8))
+        ttk.Checkbutton(fmt_frame, text="JSON", variable=self.format_json_var).pack(side="left", padx=(0, 8))
+        ttk.Checkbutton(fmt_frame, text="TSV", variable=self.format_tsv_var).pack(side="left", padx=(0, 8))
+        ttk.Checkbutton(fmt_frame, text="MultiQC", variable=self.format_multiqc_var).pack(side="left", padx=(0, 8))
+
         # ── Advanced settings (collapsible) ──
-        ttk.Separator(root, orient="horizontal").grid(row=15, column=0, columnspan=3, sticky="ew", pady=8)
+        ttk.Separator(root, orient="horizontal").grid(row=16, column=0, columnspan=3, sticky="ew", pady=8)
 
         self.advanced_open = tk.BooleanVar(master=root, value=False)
         self.advanced_toggle = ttk.Button(
             root, text="Advanced Settings (optional) \u25b6", command=self._toggle_advanced
         )
-        self.advanced_toggle.grid(row=16, column=0, columnspan=3, pady=(0, 4))
+        self.advanced_toggle.grid(row=17, column=0, columnspan=3, pady=(0, 4))
 
         self.advanced_frame = ttk.LabelFrame(root, text="Advanced Settings", padding=8)
         # Not gridded initially — shown/hidden by _toggle_advanced
@@ -316,7 +349,7 @@ class CovSnapGUI:
             self.advanced_open.set(False)
             self.advanced_toggle.config(text="Advanced Settings (optional) \u25b6")
         else:
-            self.advanced_frame.grid(row=16, column=0, columnspan=3, padx=12, pady=(0, 4), sticky="ew")
+            self.advanced_frame.grid(row=17, column=0, columnspan=3, padx=12, pady=(0, 4), sticky="ew")
             self.advanced_open.set(True)
             self.advanced_toggle.config(text="Advanced Settings (optional) \u25bc")
 
@@ -403,6 +436,12 @@ class CovSnapGUI:
             reference=reference,
             engine=self.engine_var.get(),
             output=self.output_var.get().strip() or "covsnap.report.html",
+            format=_selected_formats(
+                self.format_html_var.get(),
+                self.format_json_var.get(),
+                self.format_tsv_var.get(),
+                self.format_multiqc_var.get(),
+            ),
             threads=threads,
             emit_lowcov=self.emit_lowcov_var.get(),
             lowcov_threshold=lowcov_threshold,

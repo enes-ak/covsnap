@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use covsnap, please cite it using these metadata."
 title: "covsnap: Coverage inspector for targeted sequencing QC"
 type: software
-version: 0.4.0
-date-released: "2026-04-17"
+version: 0.5.0
+date-released: "2026-06-29"
 license: MIT
 repository-code: "https://github.com/enes-ak/covsnap"
 keywords:

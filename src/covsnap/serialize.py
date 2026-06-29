@@ -106,7 +106,7 @@ def report_to_dict(ctx: ReportContext) -> dict:
 
 def write_json_report(path: str, ctx: ReportContext) -> None:
     """Write the full native JSON report to *path*."""
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(report_to_dict(ctx), f, indent=2)
 
 
@@ -138,9 +138,7 @@ def write_multiqc_report(path: str, ctx: ReportContext) -> None:
         pct20 = sum(r.pct_thresholds.get(20, 0.0) * r.length_bp for r in results) / total_len
         row["pct_ge_20"] = round(pct20, 2)
     row["worst_status"] = (
-        max((r.coverage_status for r in results), key=lambda s: _STATUS_SEVERITY.get(s, 0))
-        if results
-        else ""
+        max((r.coverage_status for r in results), key=lambda s: _STATUS_SEVERITY.get(s, 0)) if results else ""
     )
 
     payload = {
@@ -163,8 +161,18 @@ def write_tsv_report(path: str, ctx: ReportContext) -> None:
     """Write a flat, target-level TSV (one row per target; exons excluded)."""
     thresholds = sorted(ctx.thresholds)
     columns = [
-        "sample_name", "target_id", "contig", "start", "end", "length_bp",
-        "mean_depth", "median_depth", "min_depth", "max_depth", "stdev_depth", "pct_zero",
+        "sample_name",
+        "target_id",
+        "contig",
+        "start",
+        "end",
+        "length_bp",
+        "mean_depth",
+        "median_depth",
+        "min_depth",
+        "max_depth",
+        "stdev_depth",
+        "pct_zero",
     ]
     columns += [f"pct_ge_{t}" for t in thresholds]
     columns += ["coverage_status", "n_lowcov_blocks", "lowcov_total_bp"]
@@ -173,9 +181,18 @@ def write_tsv_report(path: str, ctx: ReportContext) -> None:
         f.write("\t".join(columns) + "\n")
         for r in ctx.results:
             row = [
-                ctx.sample_name, r.target_id, r.contig, str(r.start), str(r.end),
-                str(r.length_bp), str(r.mean_depth), str(r.median_depth),
-                str(r.min_depth), str(r.max_depth), str(r.stdev_depth), str(r.pct_zero),
+                ctx.sample_name,
+                r.target_id,
+                r.contig,
+                str(r.start),
+                str(r.end),
+                str(r.length_bp),
+                str(r.mean_depth),
+                str(r.median_depth),
+                str(r.min_depth),
+                str(r.max_depth),
+                str(r.stdev_depth),
+                str(r.pct_zero),
             ]
             row += [str(r.pct_thresholds.get(t, 0.0)) for t in thresholds]
             row += [r.coverage_status, str(r.n_lowcov_blocks), str(r.lowcov_total_bp)]
@@ -193,15 +210,11 @@ def parse_formats(spec: str) -> list[str]:
         if not fmt:
             continue
         if fmt not in VALID_FORMATS:
-            raise ValueError(
-                f"Invalid output format '{fmt}'. Valid formats: {', '.join(VALID_FORMATS)}."
-            )
+            raise ValueError(f"Invalid output format '{fmt}'. Valid formats: {', '.join(VALID_FORMATS)}.")
         if fmt not in seen:
             seen.append(fmt)
     if not seen:
-        raise ValueError(
-            f"No valid output format specified. Valid formats: {', '.join(VALID_FORMATS)}."
-        )
+        raise ValueError(f"No valid output format specified. Valid formats: {', '.join(VALID_FORMATS)}.")
     return seen
 
 

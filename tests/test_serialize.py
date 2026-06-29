@@ -56,23 +56,25 @@ def _make_context(results=None, **overrides) -> ReportContext:
 class TestReportToDict:
     def test_top_level_keys(self):
         d = report_to_dict(_make_context())
-        assert set(d) >= {
-            "covsnap_version", "schema_version", "run", "summary", "targets", "genes"
-        }
+        assert set(d) >= {"covsnap_version", "schema_version", "run", "summary", "targets", "genes"}
         assert d["schema_version"] == "1.0"
 
     def test_run_section_has_all_classify_params(self):
         d = report_to_dict(_make_context())
         cp = d["run"]["classify_params"]
         assert set(cp) == {
-            "pass_pct_ge_20", "pass_max_pct_zero", "dropout_pct_zero",
-            "dropout_zero_block_bp", "uneven_cv", "exon_pct_ge_20", "exon_max_pct_zero",
+            "pass_pct_ge_20",
+            "pass_max_pct_zero",
+            "dropout_pct_zero",
+            "dropout_zero_block_bp",
+            "uneven_cv",
+            "exon_pct_ge_20",
+            "exon_max_pct_zero",
         }
         assert cp["pass_pct_ge_20"] == 95.0
 
     def test_summary_counts(self):
-        results = [_make_result(coverage_status="PASS"),
-                   _make_result(target_id="TP53", coverage_status="LOW_COVERAGE")]
+        results = [_make_result(coverage_status="PASS"), _make_result(target_id="TP53", coverage_status="LOW_COVERAGE")]
         d = report_to_dict(_make_context(results=results))
         assert d["summary"]["n_targets"] == 2
         assert d["summary"]["n_pass"] == 1
@@ -94,8 +96,11 @@ class TestReportToDict:
         d = report_to_dict(_make_context(results=[r]))
         blk = d["targets"][0]["lowcov_blocks"][0]
         assert blk == {
-            "contig": "chr17", "start": 43100000, "end": 43100060,
-            "length": 60, "mean_depth": 3.2,
+            "contig": "chr17",
+            "start": 43100000,
+            "end": 43100060,
+            "length": 60,
+            "mean_depth": 3.2,
         }
 
     def test_exons_nested_when_present(self):
@@ -141,7 +146,6 @@ class TestTsvWriter:
             return [line.rstrip("\n").split("\t") for line in f]
 
     def test_header_and_row_count(self, tmp_path):
-        from covsnap.serialize import write_tsv_report
         results = [_make_result(), _make_result(target_id="TP53")]
         path = str(tmp_path / "out.tsv")
         write_tsv_report(path, _make_context(results=results))
@@ -151,7 +155,6 @@ class TestTsvWriter:
         assert rows[0][1] == "target_id"
 
     def test_threshold_columns_present(self, tmp_path):
-        from covsnap.serialize import write_tsv_report
         path = str(tmp_path / "out.tsv")
         write_tsv_report(path, _make_context())
         header = self._read(path)[0]
@@ -161,7 +164,6 @@ class TestTsvWriter:
         assert header.index("pct_ge_1") < header.index("pct_ge_20")
 
     def test_row_values(self, tmp_path):
-        from covsnap.serialize import write_tsv_report
         path = str(tmp_path / "out.tsv")
         write_tsv_report(path, _make_context())
         rows = self._read(path)
@@ -182,6 +184,7 @@ class TestMultiqcWriter:
 
     def test_required_keys(self, tmp_path):
         from covsnap.serialize import write_multiqc_report
+
         path = str(tmp_path / "out_mqc.json")
         write_multiqc_report(path, _make_context())
         d = self._load(path)
@@ -191,14 +194,21 @@ class TestMultiqcWriter:
 
     def test_aggregation_weighted_and_counts(self, tmp_path):
         from covsnap.serialize import write_multiqc_report
+
         # Two targets, different lengths and pct_ge_20, one PASS one LOW_COVERAGE.
         r1 = _make_result(
-            target_id="A", length_bp=100, mean_depth=100.0,
-            pct_thresholds={20: 100.0}, coverage_status="PASS",
+            target_id="A",
+            length_bp=100,
+            mean_depth=100.0,
+            pct_thresholds={20: 100.0},
+            coverage_status="PASS",
         )
         r2 = _make_result(
-            target_id="B", length_bp=300, mean_depth=20.0,
-            pct_thresholds={20: 50.0}, coverage_status="LOW_COVERAGE",
+            target_id="B",
+            length_bp=300,
+            mean_depth=20.0,
+            pct_thresholds={20: 50.0},
+            coverage_status="LOW_COVERAGE",
         )
         path = str(tmp_path / "out_mqc.json")
         write_multiqc_report(path, _make_context(results=[r1, r2], thresholds=[20]))
@@ -214,6 +224,7 @@ class TestMultiqcWriter:
 
     def test_worst_status_severity_order(self, tmp_path):
         from covsnap.serialize import write_multiqc_report
+
         results = [
             _make_result(target_id="A", coverage_status="PASS"),
             _make_result(target_id="B", coverage_status="DROP_OUT"),
@@ -225,6 +236,7 @@ class TestMultiqcWriter:
 
     def test_pct_ge_20_omitted_when_threshold_absent(self, tmp_path):
         from covsnap.serialize import write_multiqc_report
+
         path = str(tmp_path / "out_mqc.json")
         write_multiqc_report(path, _make_context(thresholds=[1, 10, 30]))
         assert "pct_ge_20" not in self._load(path)["data"]["SAMPLE_01"]
@@ -233,25 +245,32 @@ class TestMultiqcWriter:
 class TestFormatParsing:
     def test_default_single(self):
         from covsnap.serialize import parse_formats
+
         assert parse_formats("html") == ["html"]
 
     def test_multi_and_dedupe(self):
         from covsnap.serialize import parse_formats
+
         assert parse_formats("html, json , json,tsv") == ["html", "json", "tsv"]
 
     def test_case_insensitive(self):
         from covsnap.serialize import parse_formats
+
         assert parse_formats("JSON,MultiQC") == ["json", "multiqc"]
 
     def test_invalid_token_raises(self):
         import pytest
+
         from covsnap.serialize import parse_formats
+
         with pytest.raises(ValueError):
             parse_formats("html,pdf")
 
     def test_empty_raises(self):
         import pytest
+
         from covsnap.serialize import parse_formats
+
         with pytest.raises(ValueError):
             parse_formats("")
 
@@ -259,9 +278,8 @@ class TestFormatParsing:
 class TestPathDerivation:
     def test_strips_html_extension(self):
         from covsnap.serialize import derive_output_paths
-        paths = derive_output_paths(
-            "covsnap.report.html", ["html", "json", "tsv", "multiqc"]
-        )
+
+        paths = derive_output_paths("covsnap.report.html", ["html", "json", "tsv", "multiqc"])
         assert paths["html"] == "covsnap.report.html"
         assert paths["json"] == "covsnap.report.json"
         assert paths["tsv"] == "covsnap.report.tsv"
@@ -269,11 +287,13 @@ class TestPathDerivation:
 
     def test_no_html_extension_used_as_stem(self):
         from covsnap.serialize import derive_output_paths
+
         paths = derive_output_paths("myreport", ["html", "multiqc"])
         assert paths["html"] == "myreport.html"
         assert paths["multiqc"] == "myreport_mqc.json"
 
     def test_only_requested_formats(self):
         from covsnap.serialize import derive_output_paths
+
         paths = derive_output_paths("r.html", ["json"])
         assert paths == {"json": "r.json"}

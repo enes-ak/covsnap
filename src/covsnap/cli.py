@@ -30,19 +30,19 @@ from covsnap.annotation import (
 from covsnap.bed import enforce_limits
 from covsnap.engines import compute_depth, ensure_index, select_engine
 from covsnap.html_report import write_html_report
-from covsnap.serialize import (
-    derive_output_paths,
-    parse_formats,
-    write_json_report,
-    write_multiqc_report,
-    write_tsv_report,
-)
 from covsnap.metrics import TargetResult, merge_exon_results
 from covsnap.report import (
     ClassifyParams,
     ReportContext,
     classify_exon,
     classify_target,
+)
+from covsnap.serialize import (
+    derive_output_paths,
+    parse_formats,
+    write_json_report,
+    write_multiqc_report,
+    write_tsv_report,
 )
 
 logger = logging.getLogger("covsnap")
@@ -930,8 +930,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         n_pass = sum(1 for r in results if r.coverage_status == "PASS")
         n_total = len(results)
         print(
-            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. "
-            f"Output: {', '.join(written)}",
+            f"[covsnap] Done. {n_pass}/{n_total} targets PASS. Output: {', '.join(written)}",
             file=sys.stderr,
         )
 

@@ -204,3 +204,47 @@ class TestCLIBedGuardrails:
                 ]
             )
         assert exc_info.value.code == 4
+
+
+class TestCLIFormatFlag:
+    @pytest.fixture(autouse=True)
+    def _samtools(self):
+        _requires_samtools()
+
+    def test_multi_format_produces_all_files(self, synthetic_bam, tmp_output_dir):
+        """--format json,tsv,multiqc produces all three derived output files."""
+        import json
+
+        html_out = str(tmp_output_dir / "report.html")
+        main(
+            [
+                synthetic_bam,
+                "BRCA1",
+                "-o",
+                html_out,
+                "--format",
+                "json,tsv,multiqc",
+                "--engine",
+                "samtools",
+            ]
+        )
+        stem = str(tmp_output_dir / "report")
+        assert os.path.isfile(stem + ".json"), "JSON output missing"
+        assert os.path.isfile(stem + ".tsv"), "TSV output missing"
+        assert os.path.isfile(stem + "_mqc.json"), "MultiQC output missing"
+        with open(stem + ".json", encoding="utf-8") as f:
+            data = json.load(f)
+        assert "targets" in data
+
+    def test_invalid_format_exits_with_code_1(self, synthetic_bam):
+        """--format pdf is not a valid format and should exit with code 1."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(
+                [
+                    synthetic_bam,
+                    "BRCA1",
+                    "--format",
+                    "pdf",
+                ]
+            )
+        assert exc_info.value.code == 1

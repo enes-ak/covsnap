@@ -110,6 +110,55 @@ def write_json_report(path: str, ctx: ReportContext) -> None:
         json.dump(report_to_dict(ctx), f, indent=2)
 
 
+# Severity order for worst_status aggregation (higher = more severe).
+_STATUS_SEVERITY = {
+    "PASS": 0,
+    "LOW_COVERAGE": 1,
+    "LOW_EXON": 2,
+    "UNEVEN": 3,
+    "DROP_OUT": 4,
+}
+
+
+def write_multiqc_report(path: str, ctx: ReportContext) -> None:
+    """Write a MultiQC custom-content file (one sample-level summary row)."""
+    results = ctx.results
+    n_targets = len(results)
+    n_pass = sum(1 for r in results if r.coverage_status == "PASS")
+    total_len = sum(r.length_bp for r in results) or 1
+
+    mean_depth = sum(r.mean_depth * r.length_bp for r in results) / total_len
+    row = {
+        "n_targets": n_targets,
+        "n_pass": n_pass,
+        "pct_targets_pass": round(n_pass / n_targets * 100, 2) if n_targets else 0.0,
+        "mean_depth": round(mean_depth, 2),
+    }
+    if 20 in ctx.thresholds:
+        pct20 = sum(r.pct_thresholds.get(20, 0.0) * r.length_bp for r in results) / total_len
+        row["pct_ge_20"] = round(pct20, 2)
+    row["worst_status"] = (
+        max((r.coverage_status for r in results), key=lambda s: _STATUS_SEVERITY.get(s, 0))
+        if results
+        else ""
+    )
+
+    payload = {
+        "id": "covsnap",
+        "section_name": "covsnap Coverage QC",
+        "description": "Per-sample targeted-sequencing coverage QC summary from covsnap.",
+        "plot_type": "table",
+        "pconfig": {
+            "id": "covsnap_table",
+            "title": "covsnap: Coverage QC",
+            "namespace": "covsnap",
+        },
+        "data": {ctx.sample_name: row},
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
 def write_tsv_report(path: str, ctx: ReportContext) -> None:
     """Write a flat, target-level TSV (one row per target; exons excluded)."""
     thresholds = sorted(ctx.thresholds)

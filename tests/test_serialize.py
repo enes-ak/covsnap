@@ -173,3 +173,58 @@ class TestTsvWriter:
         assert rec["coverage_status"] == "PASS"
         # constant column count across all rows
         assert all(len(r) == len(header) for r in rows)
+
+
+class TestMultiqcWriter:
+    def _load(self, path):
+        with open(path) as f:
+            return json.load(f)
+
+    def test_required_keys(self, tmp_path):
+        from covsnap.serialize import write_multiqc_report
+        path = str(tmp_path / "out_mqc.json")
+        write_multiqc_report(path, _make_context())
+        d = self._load(path)
+        assert d["id"] == "covsnap"
+        assert d["plot_type"] == "table"
+        assert "SAMPLE_01" in d["data"]
+
+    def test_aggregation_weighted_and_counts(self, tmp_path):
+        from covsnap.serialize import write_multiqc_report
+        # Two targets, different lengths and pct_ge_20, one PASS one LOW_COVERAGE.
+        r1 = _make_result(
+            target_id="A", length_bp=100, mean_depth=100.0,
+            pct_thresholds={20: 100.0}, coverage_status="PASS",
+        )
+        r2 = _make_result(
+            target_id="B", length_bp=300, mean_depth=20.0,
+            pct_thresholds={20: 50.0}, coverage_status="LOW_COVERAGE",
+        )
+        path = str(tmp_path / "out_mqc.json")
+        write_multiqc_report(path, _make_context(results=[r1, r2], thresholds=[20]))
+        row = self._load(path)["data"]["SAMPLE_01"]
+        assert row["n_targets"] == 2
+        assert row["n_pass"] == 1
+        assert row["pct_targets_pass"] == 50.0
+        # length-weighted mean_depth = (100*100 + 20*300) / 400 = 40.0
+        assert row["mean_depth"] == 40.0
+        # length-weighted pct_ge_20 = (100*100 + 50*300) / 400 = 62.5
+        assert row["pct_ge_20"] == 62.5
+        assert row["worst_status"] == "LOW_COVERAGE"
+
+    def test_worst_status_severity_order(self, tmp_path):
+        from covsnap.serialize import write_multiqc_report
+        results = [
+            _make_result(target_id="A", coverage_status="PASS"),
+            _make_result(target_id="B", coverage_status="DROP_OUT"),
+            _make_result(target_id="C", coverage_status="UNEVEN"),
+        ]
+        path = str(tmp_path / "out_mqc.json")
+        write_multiqc_report(path, _make_context(results=results))
+        assert self._load(path)["data"]["SAMPLE_01"]["worst_status"] == "DROP_OUT"
+
+    def test_pct_ge_20_omitted_when_threshold_absent(self, tmp_path):
+        from covsnap.serialize import write_multiqc_report
+        path = str(tmp_path / "out_mqc.json")
+        write_multiqc_report(path, _make_context(thresholds=[1, 10, 30]))
+        assert "pct_ge_20" not in self._load(path)["data"]["SAMPLE_01"]
